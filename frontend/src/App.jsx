@@ -52,7 +52,7 @@ function App(){
   {page==="Article Gallery"&&<Gallery articles={articles} search={articleSearch} setSearch={setArticleSearch} status={statusFilter} setStatus={setStatusFilter} selected={selected} setSelected={setSelected} onQueue={selectArticles}/>}
   {page==="Production Queue"&&<Queue queue={queue} generate={generate}/>}
   {page==="Story Writer"&&<Writer scripts={scripts} queue={queue} generate={generate}/>}
-  {page==="Content Management"&&<Content content={content} setContent={setContent} avatars={avatars} music={music} templates={templates} save={saveContent} />}
+  {page==="Content Management"&&<Content content={content} setContent={setContent} avatars={avatars} music={music} templates={templates} scripts={scripts} save={saveContent} />}
   {page==="Settings"&&<Settings avatars={avatars} setAvatars={setAvatars} form={avatarForm} setForm={setAvatarForm} music={music} refresh={refresh}/>}
   </div></main></div>
 }
