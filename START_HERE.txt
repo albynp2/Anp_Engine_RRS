@@ -1,0 +1,19 @@
+HORROR CONTENT FACTORY — START HERE
+
+1. Extract/merge the contents of this package into your existing PROJECT folder.
+2. KEEP your existing .env file and database/horror.db. This source package intentionally excludes secrets and database files.
+3. Confirm PROJECT/.env contains OPENAI_API_KEY=your_real_key (do not share it).
+4. Double-click run_app.bat.
+5. Wait for first-time dependency installation. The local browser UI will open.
+
+UI pages:
+- Overview: counts and queue statuses
+- Research: run research + AI scoring
+- Story Writer: choose one queued story and generate its script
+- Generated Scripts: browse saved scripts
+- System Check: inspect DB location, integrity, tables, and API-key presence
+
+The primary database path is PROJECT/database/horror.db.
+The old root PROJECT/horror.db is not used by the application modules. Do not delete backups until you have verified your data.
+
+If .env in the previously shared archive contained a real OpenAI key, revoke/rotate it and update your local .env.

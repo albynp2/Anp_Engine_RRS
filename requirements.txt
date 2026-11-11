@@ -1,0 +1,7 @@
+openai
+python-dotenv
+tqdm
+requests
+beautifulsoup4
+feedparser
+scikit-learn
