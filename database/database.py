@@ -239,6 +239,8 @@ def queue_selected_topic(
     ))
 
     inserted = cursor.rowcount > 0
+    if inserted:
+        cursor.execute("UPDATE stories SET status='SELECTED', used_at=CURRENT_TIMESTAMP WHERE id=?", (story_id,))
 
     conn.commit()
     conn.close()
