@@ -44,6 +44,7 @@ def run_research(cfg):
     from datetime import datetime, timedelta
     from email.utils import parsedate_to_datetime
     from research.researcher import search_google_news
+    from research.content_fetcher import fetch_article_content
     from research.popularity import analyze_popularity
     from database.database import (
         create_database,
@@ -51,6 +52,8 @@ def run_research(cfg):
         get_story_status,
         get_story_id_by_url,
         queue_selected_topic,
+        update_story_content,
+        save_ai_score,
     )
 
     queries = [str(value).strip() for value in cfg.get("queries", []) if str(value).strip()]
@@ -133,6 +136,28 @@ def run_research(cfg):
     emit("progress", percent=48, stage="Analisis popularitas lokal (TF-IDF/clustering)")
 
     ranked = analyze_popularity(filtered) if filtered else []
+    emit("progress", percent=52, stage="Mengambil konten artikel asli")
+    fetch_ok = 0
+    fetch_failed = 0
+    for index, item in enumerate(filtered, 1):
+        story_id = get_story_id_by_url(item["url"])
+        if story_id is None:
+            save_story(item)
+            story_id = get_story_id_by_url(item["url"])
+        try:
+            content = fetch_article_content(item["url"])
+            if len(content.strip()) < 300:
+                raise ValueError("Konten artikel terlalu pendek/tidak terdeteksi.")
+            item["source_content"] = content
+            update_story_content(story_id, content, "FETCHED", None)
+            fetch_ok += 1
+        except Exception as exc:
+            item["source_content"] = ""
+            update_story_content(story_id, "", "ISI TIDAK TERSEDIA", str(exc))
+            fetch_failed += 1
+        emit("progress", percent=int(52 + 10 * index / max(1, len(filtered))), stage=f"Artikel asli {index}/{len(filtered)}")
+    filtered = [item for item in filtered if item.get("source_content")]
+    emit("log", level="info", message=f"Konten sumber berhasil diambil: {fetch_ok}; tidak tersedia: {fetch_failed}. Kandidat tanpa konten tidak dikirim ke AI.")
     emit("progress", percent=62, stage="Menyimpan artikel ke SQLite")
 
     new_count = 0
@@ -159,11 +184,12 @@ def run_research(cfg):
     candidates = []
 
     for topic in ranked[:candidate_limit]:
+        source_item = next((item for item in filtered if item.get("url") == topic.get("url")), {})
         candidates.append({
-            key: topic.get(key)
+            key: (source_item.get(key) if key == "source_content" else topic.get(key))
             for key in (
                 "title", "url", "source", "published", "popularity_score",
-                "coverage_count", "unique_source_count", "query_count",
+                "coverage_count", "unique_source_count", "query_count", "source_content",
             )
         })
 
@@ -222,7 +248,7 @@ def run_research(cfg):
     emit("progress", percent=100, stage="Research dan AI scoring selesai")
     return {
         "rawCount": len(all_items), "filteredCount": len(filtered),
-        "newCount": new_count, "scoredCount": len(top), "queuedCount": queued,
+        "newCount": new_count, "scoredCount": len(top), "queuedCount": 0, "fetchedCount": fetch_ok, "unavailableCount": fetch_failed,
     }
 
 
@@ -238,7 +264,7 @@ def run_generate(cfg):
     story_id = int(cfg["storyId"])
     rows = query_all(
         """SELECT q.id queue_id, q.story_id, q.rank, q.research_popularity,
-                  q.overall_score, s.title, s.url, s.source, s.published
+                  q.overall_score, s.title, s.url, s.source, s.published, s.source_content, s.fetch_status
            FROM production_queue q
            JOIN stories s ON s.id = q.story_id
            WHERE q.story_id = ?
@@ -499,6 +525,24 @@ def run_action(action, cfg):
         return get_content_settings()
     if action == "save_content_settings":
         return save_content_settings(cfg)
+    if action == "avatars":
+        from database.database import list_avatars
+        return {"items": list_avatars()}
+    if action == "save_avatar":
+        from database.database import save_avatar
+        return save_avatar(cfg)
+    if action == "music":
+        from database.database import list_music
+        return {"items": list_music()}
+    if action == "save_music":
+        from database.database import save_music
+        return save_music(cfg)
+    if action == "templates":
+        from database.database import list_templates
+        return {"items": list_templates()}
+    if action == "save_template":
+        from database.database import save_template
+        return save_template(cfg)
     if action == "system":
         database_path = ROOT / "database" / "horror.db"
         return {
