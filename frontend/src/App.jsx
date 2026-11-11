@@ -3,7 +3,7 @@ import"./styles.css";
 
 const API="http://127.0.0.1:3001/api";
 const menus=["Dashboard","Research RRS","Article Gallery","Production Queue","Story Writer","Content Management","Settings"];
-const horrorQueries=["kisah horor nyata Indonesia","cerita mistis Indonesia","kejadian misterius Indonesia","pengalaman horor Indonesia","urban legend Indonesia","misteri Indonesia","kejadian aneh Indonesia","penampakan Indonesia"];
+const horrorQueries=["kisah horor nyata Indonesia","cerita mistis Indonesia","kejadian misterius Indonesia","pengalaman horor Indonesia","urban legend Indonesia","misteri Indonesia","kejadian aneh Indonesia","penampakan Indonesia","kasus misterius Indonesia","kejadian mengerikan Indonesia","kasus pembunuhan misterius Indonesia","crime mystery Indonesia"];
 const excludeDefaults=["film","trailer","game","netflix","bioskop","sinopsis"];
 
 async function api(path,opts={}){
