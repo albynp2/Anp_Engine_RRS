@@ -13,7 +13,7 @@ client = OpenAI(
 )
 
 
-def score_stories(topics):
+def score_stories(topics, mode="horror", custom_query=""):
 
     candidates = []
 
@@ -50,10 +50,53 @@ def score_stories(topics):
                 (topic.get("source_content") or "")[:2000]
         })
 
-    prompt = f"""
+    if mode == "custom":
+        prompt_intro = f"""
+Kamu adalah Content Researcher sekaligus Trend Researcher.
+
+MODE: CUSTOM QUERY
+QUERY USER: {custom_query}
+
+Tujuan utama mode ini adalah menemukan berita/topik yang
+SEDANG BERKEMBANG, RAMAI DIBERITAKAN, DAN RELEVAN dengan
+query user.
+
+Jangan memaksakan topik menjadi cerita horror/misteri.
+Query user adalah konteks utama. Topik politik, kriminal,
+teknologi, tokoh publik, peristiwa nasional, atau kategori
+lain harus dinilai sesuai query-nya.
+
+Yang lebih penting:
+- recency
+- jumlah sumber yang membahas cerita/topik yang sama
+- relevansi terhadap query
+- kualitas sumber
+- perkembangan terbaru
+
+Story potential tetap dinilai, tetapi hanya sebagai sinyal
+sekunder. Jangan menurunkan topik hanya karena tidak punya
+narasi pengalaman panjang.
+
+"""
+    else:
+        prompt_intro = """
 Kamu adalah Content Researcher sekaligus
 Content Quality Gate untuk channel
 cerita horror / misteri Indonesia.
+
+MODE: HORROR / MYSTERY
+
+Tujuan utama mode ini adalah menemukan BAHAN CERITA
+yang kuat untuk dijadikan video narasi 60-90 detik.
+
+Story potential, curiosity, horror/mystery strength,
+content quality, dan detail kejadian lebih penting daripada
+jumlah media yang meliput.
+
+"""
+
+    prompt = f"""
+{prompt_intro}
 
 Saya sudah melakukan:
 
@@ -72,46 +115,47 @@ PALING LAYAK dijadikan konten horror/misteri
 YouTube Shorts dan Facebook Reels.
 
 ==================================================
-PRINSIP UTAMA
+PRINSIP PENILAIAN SESUAI MODE
 ==================================================
 
-Jangan hanya memilih artikel karena memiliki
-kata:
+HORROR / MYSTERY:
+Nilai utama adalah kekuatan cerita:
+- story_potential
+- curiosity
+- horror_strength
+- content_quality
+- uniqueness
+- detail kejadian
+Coverage dan recency tetap dipakai, tetapi bukan tujuan utama.
 
-- horror
-- mistis
-- misteri
-- gaib
-- kesurupan
-- angker
+CUSTOM QUERY:
+Nilai utama adalah kekuatan tren/topik:
+- source_coverage
+- recency
+- search_relevance
+- source_quality
+- perkembangan berita terbaru
+Story potential hanya sinyal sekunder.
 
-Yang paling penting adalah:
-
-APAKAH TOPIK TERSEBUT MEMILIKI CERITA
-YANG CUKUP KUAT UNTUK DIJADIKAN VIDEO?
+Jangan menerapkan quality gate horror/mystery
+kepada Custom Query.
 
 ==================================================
-QUALITY GATE
+QUALITY GATE HORROR / MYSTERY
 ==================================================
 
-Sebelum memberi skor, lakukan pemeriksaan:
+Hanya untuk MODE HORROR / MYSTERY, periksa:
 
-1. APAKAH ADA PERISTIWA / MISTERI YANG BISA
-   DICERITAKAN?
-
-2. APAKAH TOPIK MEMILIKI UNSUR HORROR,
-   MISTIS, MISTERI, ATAU KEANEHAN YANG KUAT?
-
-3. APAKAH TOPIK BISA MENJADI NARASI
-   60-90 DETIK?
-
-4. APAKAH PENONTON AKAN MEMILIKI RASA
-   PENASARAN?
-
+1. APAKAH ADA PERISTIWA / MISTERI YANG BISA DICERITAKAN?
+2. APAKAH ADA UNSUR HORROR, MISTIS, MISTERI, ATAU KEANEHAN?
+3. APAKAH BISA MENJADI NARASI 60-90 DETIK?
+4. APAKAH MEMBUAT PENONTON PENASARAN?
 5. APAKAH INFORMASINYA CUKUP UNTUK WRITER?
 
-Jika jawabannya sebagian besar TIDAK,
-berikan skor rendah walaupun popularity tinggi.
+Jika sebagian besar TIDAK, beri skor rendah walaupun coverage tinggi.
+
+Untuk CUSTOM QUERY, jangan menurunkan skor hanya karena
+artikel tidak memiliki pengalaman pribadi atau narasi panjang.
 
 ==================================================
 TOPIK YANG HARUS DITURUNKAN NILAINYA
@@ -240,18 +284,40 @@ Content Quality berarti:
 BOBOT FINAL
 ==================================================
 
-Source Coverage    : 40%
-Search Relevance   : 30%
-Recency            : 20%
-Source Quality     : 10%
+MODE HORROR / MYSTERY:
+Story Potential     : 25%
+Curiosity           : 20%
+Horror Strength     : 15%
+Content Quality     : 15%
+Uniqueness          : 10%
+Recency             : 5%
+Source Coverage     : 5%
+Source Quality      : 5%
 
-Namun:
+MODE CUSTOM QUERY:
+Source Coverage     : 30%
+Recency              : 25%
+Search Relevance     : 25%
+Source Quality       : 10%
+Story Potential      : 5%
+Uniqueness           : 5%
 
+CATATAN:
+Bobot Custom Query menekankan TREND SIGNAL.
+Coverage berarti jumlah sumber/media yang membahas
+topik yang sama, bukan views atau traffic.
+
+HORROR / MYSTERY QUALITY GATE:
 Jika content_quality < 50,
-overall_score HARUS dibatasi maksimal 49.
+overall_score maksimal 49.
 
 Jika content_quality < 60,
-overall_score HARUS dibatasi maksimal 59.
+overall_score maksimal 59.
+
+CUSTOM QUERY:
+JANGAN menerapkan cap content_quality horror/mystery.
+Content quality tetap dinilai sebagai kualitas
+informasi yang tersedia.
 
 Dengan demikian popularity tinggi tidak bisa
 mengangkat topik yang sebenarnya buruk.
@@ -300,10 +366,16 @@ PENTING
 - Jangan menganggap film sebagai kejadian nyata.
 - Jangan memberi skor tinggi hanya karena
   judul terlihat horror.
+HORROR / MYSTERY:
 - Prioritaskan story potential.
 - Prioritaskan content quality.
-- Pilih topik yang benar-benar bisa dibuat
-  menjadi video horror menarik.
+- Pilih topik yang benar-benar bisa dibuat menjadi video horror menarik.
+
+CUSTOM QUERY:
+- Prioritaskan tren dan perkembangan terbaru.
+- Prioritaskan coverage, recency, query relevance, dan source quality.
+- Jangan memaksa topik menjadi cerita horror.
+- Story potential hanya menjadi bonus sekunder.
 - Pilih tepat 10 kandidat terbaik jika tersedia
   minimal 10 kandidat.
 - Jika kandidat kurang dari 10, pilih semua
@@ -315,22 +387,42 @@ PENTING
 PERHITUNGAN
 ==================================================
 
+Jika MODE = HORROR / MYSTERY:
 overall_score =
-(source_coverage * 0.40)
+(story_potential * 0.25)
 +
-(search_relevance * 0.30)
+(curiosity * 0.20)
 +
-(recency * 0.20)
+(horror_strength * 0.15)
++
+(content_quality * 0.15)
++
+(uniqueness * 0.10)
++
+(recency * 0.05)
++
+(source_coverage * 0.05)
++
+(source_quality * 0.05)
+
+Kemudian terapkan Content Quality Gate horror.
+
+Jika MODE = CUSTOM QUERY:
+overall_score =
+(source_coverage * 0.30)
++
+(recency * 0.25)
++
+(search_relevance * 0.25)
 +
 (source_quality * 0.10)
++
+(story_potential * 0.05)
++
+(uniqueness * 0.05)
 
-Kemudian terapkan Content Quality Gate:
-
-Jika content_quality < 50:
-overall_score maksimal 49.
-
-Jika content_quality < 60:
-overall_score maksimal 59.
+Jangan menerapkan cap content_quality horror/mystery
+pada Custom Query.
 
 ==================================================
 KANDIDAT
@@ -369,8 +461,7 @@ Format:
 """
 
     print(
-        "\n🧠 AI sedang melakukan "
-        "FINAL SCORING + QUALITY GATE..."
+        f"\n🧠 AI sedang melakukan FINAL SCORING — MODE: {mode.upper()}..."
     )
 
     response = client.responses.create(
