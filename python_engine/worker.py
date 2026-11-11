@@ -402,7 +402,7 @@ def run_action(action, cfg):
         search = f"%{cfg.get('search', '').strip()}%"
         status = cfg.get("status", "ALL")
         # Queue entries are excluded from the available library, not deleted.
-        where = "WHERE (s.title LIKE ? OR s.source LIKE ? OR s.url LIKE ?)"
+        where = "WHERE q.story_id IS NULL AND (s.title LIKE ? OR s.source LIKE ? OR s.url LIKE ?)"
         params = [search, search, search]
         if status not in ("ALL", "NEW", "FETCHED", "SCORED", "SELECTED", "ISI TIDAK TERSEDIA"):
             raise ValueError("Filter status artikel tidak valid.")
@@ -514,6 +514,10 @@ def run_action(action, cfg):
                 __import__("database.database", fromlist=["get_connection"]).get_connection().execute if False else None
                 inserted += 1
         return {"inserted": inserted, "requested": len(ids)}
+
+    if action == "remove_queue_item":
+        from database.database import remove_queue_item
+        return remove_queue_item(cfg.get("queueId"))
 
     if action == "set_queue_status":
         queue_id = int(cfg["queueId"])
