@@ -15,6 +15,9 @@ client = OpenAI(
 
 def generate_story(story):
 
+    source_content = str(story.get("source_content") or "").strip()
+    if not source_content:
+        raise ValueError("ISI TIDAK TERSEDIA: konten sumber belum berhasil diambil.")
     prompt = f"""
 Kamu adalah penulis konten horror profesional untuk
 YouTube Shorts dan Facebook Reels Indonesia.
@@ -37,6 +40,14 @@ Tanggal:
 
 URL:
 {story["url"]}
+
+==================================================
+KONTEN ASLI SUMBER
+==================================================
+
+Gunakan hanya fakta yang didukung teks sumber berikut:
+
+{source_content[:12000]}
 
 ==================================================
 ATURAN PALING PENTING
