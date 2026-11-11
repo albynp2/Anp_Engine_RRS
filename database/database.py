@@ -85,7 +85,7 @@ def create_database():
             "title": "TEXT", "url": "TEXT", "source": "TEXT", "published": "TEXT",
             "status": "TEXT DEFAULT 'NEW'", "created_at": "TIMESTAMP",
             "used_at": "TIMESTAMP", "popularity_score": "REAL", "overall_score": "REAL",
-            "coverage_count": "INTEGER", "unique_source_count": "INTEGER", "query_count": "INTEGER"
+            "coverage_count": "INTEGER", "unique_source_count": "INTEGER", "query_count": "INTEGER", "source_content": "TEXT", "fetch_status": "TEXT DEFAULT 'PENDING'", "fetch_error": "TEXT", "fetched_at": "TIMESTAMP", "ai_score": "REAL", "ai_reason": "TEXT"
         })
         _ensure_columns(cursor, "production_queue", {
             "story_id": "INTEGER", "rank": "INTEGER", "research_popularity": "REAL",
@@ -107,6 +107,10 @@ def create_database():
             )
         """)
 
+        cursor.execute("CREATE TABLE IF NOT EXISTS research_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, mode TEXT NOT NULL, query_text TEXT, start_date TEXT, end_date TEXT, raw_count INTEGER DEFAULT 0, filtered_count INTEGER DEFAULT 0, scored_count INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS avatars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, image_data TEXT, description TEXT, default_emotion TEXT DEFAULT 'neutral', voice_data TEXT, voice_name TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS music_library (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, audio_data TEXT, source TEXT, license TEXT, volume REAL DEFAULT 0.15, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, config_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -498,3 +502,64 @@ def get_new_stories(limit=30):
         ]
     finally:
         conn.close()
+
+def update_story_content(story_id, content, fetch_status, fetch_error=None):
+    conn=get_connection()
+    try:
+        conn.execute("UPDATE stories SET source_content=?, fetch_status=?, fetch_error=?, fetched_at=CURRENT_TIMESTAMP, status=CASE WHEN ?='FETCHED' THEN 'FETCHED' ELSE 'ISI TIDAK TERSEDIA' END WHERE id=?",(content or '',fetch_status,fetch_error,fetch_status,story_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+def save_ai_score(story_id, overall_score, reason=''):
+    conn=get_connection()
+    try:
+        conn.execute("UPDATE stories SET overall_score=?, ai_score=?, ai_reason=?, status='SCORED' WHERE id=?",(overall_score,overall_score,reason,story_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+def list_avatars():
+    conn=get_connection(); conn.row_factory=sqlite3.Row
+    try: return [dict(r) for r in conn.execute("SELECT * FROM avatars ORDER BY name").fetchall()]
+    finally: conn.close()
+
+def save_avatar(data):
+    conn=get_connection()
+    try:
+        conn.execute("INSERT INTO avatars(name,image_data,description,default_emotion,voice_data,voice_name) VALUES(?,?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET image_data=excluded.image_data,description=excluded.description,default_emotion=excluded.default_emotion,voice_data=excluded.voice_data,voice_name=excluded.voice_name,updated_at=CURRENT_TIMESTAMP",(data.get('name','').strip(),data.get('imageData',''),data.get('description',''),data.get('defaultEmotion','neutral'),data.get('voiceData',''),data.get('voiceName','')))
+        conn.commit(); return {'saved':True}
+    finally: conn.close()
+
+def list_music():
+    conn=get_connection(); conn.row_factory=sqlite3.Row
+    try: return [dict(r) for r in conn.execute("SELECT * FROM music_library ORDER BY name").fetchall()]
+    finally: conn.close()
+
+def save_music(data):
+    conn=get_connection()
+    try:
+        conn.execute("INSERT INTO music_library(name,audio_data,source,license,volume) VALUES(?,?,?,?,?)",(data.get('name','').strip(),data.get('audioData',''),data.get('source',''),data.get('license',''),float(data.get('volume',0.15))))
+        conn.commit(); return {'saved':True}
+    finally: conn.close()
+
+def list_templates():
+    import json
+    conn=get_connection(); conn.row_factory=sqlite3.Row
+    try:
+        rows=[dict(r) for r in conn.execute("SELECT * FROM templates ORDER BY name").fetchall()]
+        for row in rows:
+            try: row['config']=json.loads(row.pop('config_json'))
+            except Exception: row['config']={}
+        return rows
+    finally: conn.close()
+
+def save_template(data):
+    import json
+    name=data.get('name','').strip()
+    if not name: raise ValueError('Nama template wajib diisi.')
+    conn=get_connection()
+    try:
+        conn.execute("INSERT INTO templates(name,config_json) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET config_json=excluded.config_json,updated_at=CURRENT_TIMESTAMP",(name,json.dumps(data.get('config') or {},ensure_ascii=False)))
+        conn.commit(); return {'saved':True,'name':name}
+    finally: conn.close()
