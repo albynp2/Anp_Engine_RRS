@@ -406,16 +406,38 @@ def run_action(action, cfg):
         params = [search, search, search]
         if status not in ("ALL", "NEW", "FETCHED", "SCORED", "SELECTED", "ISI TIDAK TERSEDIA"):
             raise ValueError("Filter status artikel tidak valid.")
-        total = query_all(f"SELECT COUNT(*) n FROM stories s LEFT JOIN production_queue q ON q.story_id=s.id {where}", params)[0]["n"]
+        # Status filter must map to the lifecycle fields, not only validate
+        # the requested value. This keeps the Gallery filters meaningful:
+        # FETCHED/ISI TIDAK TERSEDIA use fetch_status, SCORED uses ai_score,
+        # and SELECTED/NEW use the story lifecycle status.
+        status_condition = ""
+        if status == "FETCHED":
+            status_condition = " AND s.fetch_status = ?"
+            params.append("FETCHED")
+        elif status == "ISI TIDAK TERSEDIA":
+            status_condition = " AND s.fetch_status = ?"
+            params.append("ISI TIDAK TERSEDIA")
+        elif status == "SCORED":
+            status_condition = " AND s.ai_score IS NOT NULL"
+        elif status in ("NEW", "SELECTED"):
+            status_condition = " AND s.status = ?"
+            params.append(status)
+
+        where_filtered = where + status_condition
+
+        total = query_all(
+            f"SELECT COUNT(*) n FROM stories s LEFT JOIN production_queue q ON q.story_id=s.id {where_filtered}",
+            params,
+        )[0]["n"]
         rows = query_all(f"""
             SELECT s.id, s.title, s.url, s.source, s.published, s.status,
                    s.popularity_score, s.overall_score, s.coverage_count,
-                   s.unique_source_count, s.query_count, s.source_content, s.fetch_status, s.ai_reason,
+                   s.unique_source_count, s.query_count, s.source_content, s.fetch_status, s.ai_score, s.ai_reason,
                    CASE WHEN g.id IS NULL THEN 0 ELSE 1 END has_script
             FROM stories s
             LEFT JOIN production_queue q ON q.story_id = s.id
             LEFT JOIN generated_stories g ON g.story_id = s.id
-            {where}
+            {where_filtered}
         """, params)
         from email.utils import parsedate_to_datetime
         from datetime import datetime, timezone
