@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from pathlib import Path
 
 DATABASE_DIR = Path(__file__).resolve().parent
 
-DB_PATH = DATABASE_DIR / "horror.db"
+DB_PATH = Path(os.getenv("DATABASE_PATH", str(DATABASE_DIR / "horror.db")))
 
 
 def get_connection():
