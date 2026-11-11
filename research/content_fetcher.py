@@ -1,8 +1,9 @@
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlsplit, parse_qs, unquote
+from urllib.parse import urljoin, urlsplit, parse_qs, unquote, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 import re
+import json
 
 
 class _ArticleParser(HTMLParser):
@@ -80,47 +81,119 @@ def _request(url, timeout=20):
         return raw, charset, getattr(response, "status", 200), response.geturl()
 
 
+def _google_article_id(url):
+    try:
+        path = urlsplit(url).path.rstrip("/")
+        if "/articles/" in path or "/read/" in path:
+            return path.split("/")[-1]
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_google_news_rpc(url):
+    """Resolve current Google News RSS article IDs using Google's Fbv4je RPC."""
+    gid = _google_article_id(url)
+    if not gid:
+        return None
+
+    cookie = "CONSENT=YES+cb; SOCS=CAI"
+    article_url = f"https://news.google.com/rss/articles/{gid}"
+    req = Request(article_url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+        "Cookie": cookie,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+    })
+    with urlopen(req, timeout=20) as response:
+        html = response.read().decode(response.headers.get_content_charset() or "utf-8", errors="replace")
+        final_url = response.geturl()
+
+    if final_url and not _is_google_news_url(final_url):
+        return final_url
+
+    sg_match = re.search(r'data-n-a-sg="([^"]+)"', html)
+    ts_match = re.search(r'data-n-a-ts="([^"]+)"', html)
+    if not sg_match or not ts_match:
+        raise RuntimeError("Google News tidak memberikan signature/timestamp untuk resolusi artikel.")
+
+    sg = sg_match.group(1)
+    ts = ts_match.group(1)
+    inner = (
+        '["garturlreq",[["X","X",["X","X"],null,null,1,1,"ID:id",null,1,'
+        'null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],'
+        f'"{gid}",{ts},"{sg}"]'
+    )
+    payload = json.dumps([[["Fbv4je", inner, None, "generic"]]], separators=(",", ":"))
+    body = urlencode({"f.req": payload}).encode()
+    rpc_url = "https://news.google.com/_/DotsSplashUi/data/batchexecute"
+    rpc_req = Request(rpc_url, data=body, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+        "Cookie": cookie,
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        "Accept": "*/*",
+    })
+    with urlopen(rpc_req, timeout=20) as response:
+        raw = response.read().decode(response.headers.get_content_charset() or "utf-8", errors="replace")
+
+    try:
+        row_text = raw.split("\n\n", 1)[1]
+        row = json.loads(row_text)[0][2]
+    except Exception as exc:
+        raise RuntimeError(f"Google News RPC response tidak dikenali: {exc}") from exc
+    if not row:
+        raise RuntimeError("Google News RPC tidak mengembalikan URL publisher.")
+    try:
+        resolved = json.loads(row)[1]
+    except Exception as exc:
+        raise RuntimeError(f"Google News RPC URL tidak valid: {exc}") from exc
+    if not resolved or _is_google_news_url(resolved):
+        raise RuntimeError("Google News RPC gagal menghasilkan URL publisher.")
+    return resolved
+
+
 def _resolve_source_url(url):
-    """
-    Resolve a Google News wrapper to the publisher URL when possible.
-    urllib follows HTTP redirects automatically. If Google still returns an
-    HTML wrapper, inspect canonical/og:url and common embedded URL parameters.
-    """
+    """Resolve a Google News wrapper to the publisher URL when possible."""
+    if _is_google_news_url(url):
+        try:
+            resolved_rpc = _resolve_google_news_rpc(url)
+            if resolved_rpc:
+                return resolved_rpc, b"", "utf-8", 200, resolved_rpc
+        except Exception as rpc_exc:
+            rpc_error = rpc_exc
+        else:
+            rpc_error = None
+    else:
+        rpc_error = None
+
     raw, charset, status, final_url = _request(url)
     html = raw.decode(charset, errors="replace")
-
     candidates = []
     if final_url and not _is_google_news_url(final_url):
         candidates.append(final_url)
-
     if _is_google_news_url(final_url) or _is_google_news_url(url):
         parser = _MetadataParser()
         parser.feed(html)
         for candidate in parser.candidates:
             candidates.append(urljoin(final_url or url, candidate))
-
         embedded = _extract_embedded_target(url)
         if embedded:
             candidates.append(embedded)
-
         embedded = _extract_embedded_target(final_url)
         if embedded:
             candidates.append(embedded)
 
-    # Keep order, remove duplicates and Google wrapper URLs.
     seen = set()
     cleaned = []
     for candidate in candidates:
         candidate = (candidate or "").strip()
-        if not candidate or _is_google_news_url(candidate):
+        if not candidate or _is_google_news_url(candidate) or candidate in seen:
             continue
-        if candidate not in seen:
-            seen.add(candidate)
-            cleaned.append(candidate)
-
+        seen.add(candidate)
+        cleaned.append(candidate)
     if cleaned:
         return cleaned[0], raw, charset, status, final_url
-
+    if rpc_error:
+        raise RuntimeError(f"Google News URL belum berhasil di-resolve: {rpc_error}")
     return final_url or url, raw, charset, status, final_url
 
 
