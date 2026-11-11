@@ -475,6 +475,28 @@ def story_already_written(story_id):
     return result is not None
 
 # ============================================================
+# STORY DELETE
+# ============================================================
+
+def delete_story(story_id):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.execute("DELETE FROM generated_stories WHERE story_id = ?", (int(story_id),))
+        cursor.execute("DELETE FROM production_queue WHERE story_id = ?", (int(story_id),))
+        cursor.execute("DELETE FROM stories WHERE id = ?", (int(story_id),))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        return {"deleted": deleted, "storyId": int(story_id)}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+}
+
+# ============================================================
 # STORIES FOR TESTING / DEVELOPMENT
 # ============================================================
 
