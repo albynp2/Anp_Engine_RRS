@@ -220,7 +220,11 @@ def run_research(cfg):
     from ai.scorer import score_stories
 
     emit("progress", percent=72, stage=f"AI scoring {len(candidates)} kandidat")
-    scored = score_stories(candidates)
+    scored = score_stories(
+        candidates,
+        mode=cfg.get("mode", "horror"),
+        custom_query=(queries[0] if cfg.get("mode") == "custom" and queries else "")
+    )
     top = scored.get("top_10", [])
     if not isinstance(top, list):
         raise ValueError("AI scoring mengembalikan format top_10 yang tidak valid.")
