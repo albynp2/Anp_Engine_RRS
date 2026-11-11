@@ -41,7 +41,7 @@ function App(){
      const end=research.endDate;
      const j=await api("/jobs/research",{method:"POST",body:JSON.stringify({queries,excludedKeywords:excludes,startDate:start,endDate:end,todayOnly:false,topCandidates:Number(research.maxCandidates),localOnly:false})});
      const es=new EventSource(API+"/jobs/"+j.id+"/events");
-     es.onmessage=e=>{const ev=JSON.parse(e.data);if(ev.type==="progress")setJob({percent:ev.percent,stage:ev.stage});if(ev.type==="error")setError(ev.message);if(ev.type==="complete"){setJob({percent:100,stage:ev.status==="completed"?"Research selesai":ev.error||"Gagal"});es.close();refresh();}};
+     es.onmessage=e=>{const ev=JSON.parse(e.data);if(ev.type==="progress")setJob({percent:ev.percent,stage:ev.stage});if(ev.type==="error")setError(ev.message);if(ev.type==="complete"){setJob({percent:100,stage:ev.status==="completed"?"Research selesai":ev.error||"Gagal",result:ev.result||null,status:ev.status});es.close();refresh();}};
      es.onerror=()=>es.close();
    }catch(e){setError(e.message)}finally{setBusy(false)}
  };
@@ -55,7 +55,7 @@ function App(){
   <aside className="side"><div className="brand"><div className="logo">🔥</div><div><b>ANP</b><strong>ENGINE RRS</strong><small>LOCAL CREATOR PIPELINE</small></div></div><div className="workspace">Creator Workspace <span>LOCAL</span></div><nav>{menus.map(m=><button className={page===m?"active":""} onClick={()=>setPage(m)} key={m}>{m}</button>)}</nav><div className="side-note"><b>Pipeline</b><span>RSS → Source → Score → Story → Video</span></div></aside>
   <main><header><div><small>Workspace / {title}</small><h1>{title}</h1></div><div className="header-actions"><div className={"ai-status "+(aiStatus.connected?"connected":"offline")} title={aiStatus.message}><span></span><b>{aiStatus.connected?"OpenAI Connected":"OpenAI Offline"}</b><small>{aiStatus.connected?"API ready":aiStatus.message}</small></div><button className="btn ghost" onClick={refresh}>↻ Refresh</button></div></header>
   <div className="wrap">{error&&<div className="error">⚠ {error}<button onClick={()=>setError("")}>×</button></div>}
-  {job&&<div className="job"><b>LIVE PROCESS</b><span>{job.stage}</span><div className="bar"><i style={{width:job.percent+"%"}}/></div><small>{job.percent}%</small></div>}
+  {job&&<div className="job"><b>LIVE PROCESS</b><span>{job.stage}</span><div className="bar"><i style={{width:job.percent+"%"}}/></div><small>{job.percent}%</small>{job.result&&<div className="job-result"><b>{job.status==="completed"?"✓ Research selesai":"⚠ Research gagal"}</b><span>Data ditemukan: <strong>{job.result.rawCount??0}</strong></span><span>Source tersedia: <strong>{job.result.fetchedCount??0}</strong></span><span>Source tidak tersedia: <strong>{job.result.unavailableCount??0}</strong></span><span>AI score tersimpan: <strong>{job.result.scoredCount??0}</strong></span></div>}</div>}
   {page==="Dashboard"&&<Dashboard dash={dash} setPage={setPage}/>}
   {page==="Research RRS"&&<Research research={research} setResearch={setResearch} runResearch={runResearch} busy={busy}/>}
   {page==="Article Gallery"&&<Gallery articles={articles} search={articleSearch} setSearch={setArticleSearch} status={statusFilter} setStatus={setStatusFilter} selected={selected} setSelected={setSelected} onQueue={selectArticles} onDelete={deleteArticle}/>} 
