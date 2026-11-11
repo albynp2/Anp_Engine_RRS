@@ -474,6 +474,36 @@ def story_already_written(story_id):
 
     return result is not None
 
+def remove_queue_item(queue_id):
+    """Remove an item from Production Queue and return its scored story to Gallery."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT story_id FROM production_queue WHERE id = ?", (int(queue_id),))
+        row = cursor.fetchone()
+        if not row:
+            return {"removed": False, "queueId": int(queue_id)}
+
+        story_id = int(row[0])
+        cursor.execute("DELETE FROM production_queue WHERE id = ?", (int(queue_id),))
+        cursor.execute("""
+            UPDATE stories
+            SET status = CASE
+                WHEN ai_score IS NOT NULL THEN 'SCORED'
+                WHEN fetch_status = 'FETCHED' THEN 'FETCHED'
+                ELSE status
+            END,
+            used_at = NULL
+            WHERE id = ?
+        """, (story_id,))
+        conn.commit()
+        return {"removed": True, "queueId": int(queue_id), "storyId": story_id}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 # ============================================================
 # STORY DELETE
 # ============================================================
