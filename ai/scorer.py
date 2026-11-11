@@ -282,17 +282,14 @@ cerita pengalaman mistis yang memiliki
 kejadian lebih jelas.
 
 ==================================================
-RESEARCH POPULARITY
+SOURCE COVERAGE
 ==================================================
 
-Research Popularity sudah dihitung secara lokal.
+Source Coverage dihitung secara lokal dari jumlah
+sumber/media yang membahas cerita yang sama.
 
-JANGAN mengubah nilai:
-
-research_popularity
-
-Jangan menganggap angka tersebut sebagai
-jumlah views media sosial.
+JANGAN menganggap angka coverage sebagai
+jumlah views atau traffic media sosial.
 
 ==================================================
 PENTING
@@ -324,8 +321,6 @@ overall_score =
 (search_relevance * 0.30)
 +
 (recency * 0.20)
-+
-(source_quality * 0.10)
 +
 (source_quality * 0.10)
 
