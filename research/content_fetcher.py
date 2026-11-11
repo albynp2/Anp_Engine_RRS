@@ -177,5 +177,21 @@ def fetch_article_content(url):
             last_error = exc
 
     if last_error:
-        raise last_error
+        detail = []
+        try:
+            raw_probe, charset_probe, status_probe, final_probe = _request(url)
+            detail.append(f"original_http={status_probe}")
+            detail.append(f"final_url={final_probe}")
+            detail.append(f"html_bytes={len(raw_probe)}")
+            probe_html = raw_probe.decode(charset_probe, errors="replace")
+            meta = _MetadataParser()
+            meta.feed(probe_html)
+            if meta.candidates:
+                detail.append(f"metadata_url={meta.candidates[0]}")
+            article_probe = _ArticleParser()
+            article_probe.feed(probe_html)
+            detail.append(f"extracted_chars={len(article_probe.text().strip())}")
+        except Exception as probe_exc:
+            detail.append(f"probe_error={str(probe_exc)[:180]}")
+        raise RuntimeError(f"{last_error} | FETCH_DEBUG: {'; '.join(detail)}")
     raise RuntimeError("Gagal mengambil konten artikel.")
