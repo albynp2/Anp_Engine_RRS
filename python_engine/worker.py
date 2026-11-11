@@ -215,7 +215,10 @@ def run_research(cfg):
     emit("progress", percent=72, stage=f"AI scoring {len(candidates)} kandidat")
     scored = score_stories(candidates)
     top = scored.get("top_10", [])
+    if not isinstance(top, list):
+        raise ValueError("AI scoring mengembalikan format top_10 yang tidak valid.")
     queued = 0
+    saved_score_count = 0
     for rank, item in enumerate(top, 1):
         try:
             candidate_index = int(item.get("id", 0)) - 1
@@ -228,11 +231,19 @@ def run_research(cfg):
         if story_id is None:
             continue
         save_ai_score(story_id, item.get("overall_score", 0), item.get("reason", ""))
+        saved_score_count += 1
 
-    emit("progress", percent=100, stage="Research dan AI scoring selesai")
+    if top and saved_score_count == 0:
+        raise ValueError(f"AI mengembalikan {len(top)} hasil scoring, tetapi tidak ada score yang berhasil disimpan ke database.")
+    emit(
+        "log",
+        level="info" if saved_score_count else "warning",
+        message=f"AI scoring selesai: {len(top)} hasil dikembalikan; {saved_score_count} score tersimpan ke SQLite.",
+    )
+    emit("progress", percent=100, stage=f"Research selesai — {len(filtered)} data, {saved_score_count} score tersimpan")
     return {
         "rawCount": len(all_items), "filteredCount": len(filtered),
-        "newCount": new_count, "scoredCount": len(top), "queuedCount": 0, "fetchedCount": fetch_ok, "unavailableCount": fetch_failed,
+        "newCount": new_count,  "scoredCount": saved_score_count, "aiReturnedCount": len(top), "queuedCount": 0, "fetchedCount": fetch_ok, "unavailableCount": fetch_failed,
     }
 
 
