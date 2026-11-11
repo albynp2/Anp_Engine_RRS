@@ -90,7 +90,7 @@ function pythonRead(action, config={}) {
     child.stdin.end(JSON.stringify({action,config}));
   });
 }
-app.get('/api/health', async (_req,res)=>{ try { const data=await pythonRead('system'); res.json({ok:true,api:'online',...data}); } catch(e){res.status(500).json({ok:false,error:e.message});} });
+app.get('/api/health', (_req,res)=>{ res.status(200).json({ok:true,api:'online',service:'backend'}); });
 app.get('/api/dashboard', async (_req,res)=>{try{res.json(await pythonRead('dashboard'))}catch(e){res.status(500).json({error:e.message,details:e.details||e.stack||''})}});
 app.get('/api/articles', async (req,res)=>{try{res.json(await pythonRead('articles',{page:req.query.page||1,limit:req.query.limit||25,search:req.query.search||'',status:req.query.status||'ALL'}))}catch(e){res.status(500).json({error:e.message,details:e.details||e.stack||''})}});
 app.get('/api/queue', async (req,res)=>{try{res.json(await pythonRead('queue',{status:req.query.status||'ALL'}))}catch(e){res.status(500).json({error:e.message,details:e.details||e.stack||''})}});
