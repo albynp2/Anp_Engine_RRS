@@ -328,9 +328,10 @@ def get_content_settings():
 def save_content_settings(cfg):
     allowed = {
         "platform", "aspectRatio", "width", "height", "fps", "durationSeconds",
-        "template", "headline", "lowerThird", "watermarkText", "watermarkOpacity",
-        "watermarkPosition", "watermarkImageData", "watermarkImageName", "voiceMode",
-        "voice", "visualMode", "subtitleEnabled", "musicMode", "selectedStoryIds", "notes"
+        "template", "templateId", "storyId", "avatarId", "fit", "headline", "lowerThird",
+        "watermarkText", "watermarkOpacity", "watermarkPosition", "watermarkImageData",
+        "watermarkImageName", "voiceMode", "voice", "voiceData", "visualMode",
+        "subtitleEnabled", "subtitleColor", "musicMode", "musicId", "selectedStoryIds", "notes"
     }
     config = {key: value for key, value in cfg.items() if key in allowed}
     if config.get("aspectRatio") not in {"9:16", "16:9", "1:1", "4:5"}:
