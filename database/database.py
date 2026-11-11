@@ -494,7 +494,6 @@ def delete_story(story_id):
         raise
     finally:
         conn.close()
-}
 
 # ============================================================
 # STORIES FOR TESTING / DEVELOPMENT
