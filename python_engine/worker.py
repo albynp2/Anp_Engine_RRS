@@ -230,22 +230,54 @@ def run_research(cfg):
         raise ValueError("AI scoring mengembalikan format top_10 yang tidak valid.")
     queued = 0
     saved_score_count = 0
+    valid_id_count = 0
+    invalid_id_count = 0
+    missing_story_count = 0
+    duplicate_id_count = 0
+    seen_candidate_ids = set()
+
     for rank, item in enumerate(top, 1):
         try:
-            candidate_index = int(item.get("id", 0)) - 1
+            candidate_id = int(item.get("id", 0))
+            candidate_index = candidate_id - 1
         except (TypeError, ValueError):
+            invalid_id_count += 1
             continue
+
+        if candidate_id in seen_candidate_ids:
+            duplicate_id_count += 1
+            continue
+        seen_candidate_ids.add(candidate_id)
+
         if candidate_index < 0 or candidate_index >= len(candidates):
+            invalid_id_count += 1
             continue
+
+        valid_id_count += 1
         topic = candidates[candidate_index]
         story_id = get_story_id_by_url(topic["url"])
         if story_id is None:
+            missing_story_count += 1
             continue
+
         save_ai_score(story_id, item.get("overall_score", 0), item.get("reason", ""))
         saved_score_count += 1
 
+    emit(
+        "log",
+        level="info" if saved_score_count else "warning",
+        message=(
+            f"AI pipeline diagnostic: {len(candidates)} kandidat lokal -> "
+            f"{len(top)} hasil AI -> {valid_id_count} ID valid -> "
+            f"{saved_score_count} score tersimpan; "
+            f"ID invalid={invalid_id_count}, story tidak ditemukan={missing_story_count}, "
+            f"ID duplikat={duplicate_id_count}."
+        ),
+    )
+
     if top and saved_score_count == 0:
         raise ValueError(f"AI mengembalikan {len(top)} hasil scoring, tetapi tidak ada score yang berhasil disimpan ke database.")
+
     emit(
         "log",
         level="info" if saved_score_count else "warning",
