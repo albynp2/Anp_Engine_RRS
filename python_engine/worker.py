@@ -145,16 +145,23 @@ def run_research(cfg):
             save_story(item)
             story_id = get_story_id_by_url(item["url"])
         try:
-            content = fetch_article_content(item["url"])
+            fetched = fetch_article_content(item["url"])
+            content = fetched["content"]
             if len(content.strip()) < 300:
                 raise ValueError("Konten artikel terlalu pendek/tidak terdeteksi.")
             item["source_content"] = content
+            item["resolved_url"] = fetched.get("resolved_url") or item["url"]
+            item["fetch_http_status"] = fetched.get("http_status")
             update_story_content(story_id, content, "FETCHED", None)
             fetch_ok += 1
         except Exception as exc:
             item["source_content"] = ""
+            item["fetch_error"] = str(exc)
             update_story_content(story_id, "", "ISI TIDAK TERSEDIA", str(exc))
             fetch_failed += 1
+            emit("log", level="warning", message=f"Source {index}/{len(filtered)} gagal: {item.get('title', '')[:80]} — {str(exc)[:240]}")
+        else:
+            emit("log", level="info", message=f"Source {index}/{len(filtered)} OK: {item.get('source', '')} — URL akhir: {item.get('resolved_url', item['url'])}")
         emit("progress", percent=int(52 + 10 * index / max(1, len(filtered))), stage=f"Artikel asli {index}/{len(filtered)}")
     filtered = [item for item in filtered if item.get("source_content")]
     emit("log", level="info", message=f"Konten sumber berhasil diambil: {fetch_ok}; tidak tersedia: {fetch_failed}. Kandidat tanpa konten tidak dikirim ke AI.")
