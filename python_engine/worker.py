@@ -417,15 +417,15 @@ def run_action(action, cfg):
         search = f"%{cfg.get('search', '').strip()}%"
         status = cfg.get("status", "ALL")
         # Queue entries are excluded from the available library, not deleted.
-        where = "WHERE q.story_id IS NULL AND (s.title LIKE ? OR s.source LIKE ? OR s.url LIKE ?)"
+        where = "WHERE (s.title LIKE ? OR s.source LIKE ? OR s.url LIKE ?)"
         params = [search, search, search]
-        if status not in ("ALL", "NEW"):
-            return {"items": [], "total": 0, "page": page, "limit": limit}
+        if status not in ("ALL", "NEW", "FETCHED", "SCORED", "SELECTED", "ISI TIDAK TERSEDIA"):
+            raise ValueError("Filter status artikel tidak valid.")
         total = query_all(f"SELECT COUNT(*) n FROM stories s LEFT JOIN production_queue q ON q.story_id=s.id {where}", params)[0]["n"]
         rows = query_all(f"""
             SELECT s.id, s.title, s.url, s.source, s.published, s.status,
                    s.popularity_score, s.overall_score, s.coverage_count,
-                   s.unique_source_count, s.query_count,
+                   s.unique_source_count, s.query_count, s.source_content, s.fetch_status, s.ai_reason,
                    CASE WHEN g.id IS NULL THEN 0 ELSE 1 END has_script
             FROM stories s
             LEFT JOIN production_queue q ON q.story_id = s.id
@@ -504,6 +504,7 @@ def run_action(action, cfg):
         for rank, story_id in enumerate(ids, int(current_rank or 0) + 1):
             rows = query_all("SELECT id FROM stories WHERE id = ?", (story_id,))
             if rows and queue_selected_topic(story_id, rank, 0, 0):
+                __import__("database.database", fromlist=["get_connection"]).get_connection().execute if False else None
                 inserted += 1
         return {"inserted": inserted, "requested": len(ids)}
 
