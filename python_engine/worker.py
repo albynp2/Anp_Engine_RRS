@@ -216,7 +216,6 @@ def run_research(cfg):
     scored = score_stories(candidates)
     top = scored.get("top_10", [])
     queued = 0
-
     for rank, item in enumerate(top, 1):
         try:
             candidate_index = int(item.get("id", 0)) - 1
@@ -224,26 +223,11 @@ def run_research(cfg):
             continue
         if candidate_index < 0 or candidate_index >= len(candidates):
             continue
-
         topic = candidates[candidate_index]
         story_id = get_story_id_by_url(topic["url"])
         if story_id is None:
             continue
-
-        conn = __import__("database.database", fromlist=["get_connection"]).get_connection()
-        try:
-            conn.execute("UPDATE stories SET overall_score=? WHERE id=?", (item.get("overall_score"), story_id))
-            conn.commit()
-        finally:
-            conn.close()
-
-        if queue_selected_topic(
-            story_id,
-            rank,
-            topic.get("popularity_score", 0),
-            item.get("overall_score", 0),
-        ):
-            queued += 1
+        save_ai_score(story_id, item.get("overall_score", 0), item.get("reason", ""))
 
     emit("progress", percent=100, stage="Research dan AI scoring selesai")
     return {
