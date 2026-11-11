@@ -39,7 +39,7 @@ function App(){
      const excludes=research.exclude.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
      const start=research.mode==="horror"&&research.startDate?research.startDate:research.startDate;
      const end=research.endDate;
-     const j=await api("/jobs/research",{method:"POST",body:JSON.stringify({queries,excludedKeywords:excludes,startDate:start,endDate:end,todayOnly:false,topCandidates:Number(research.maxCandidates),localOnly:false})});
+     const j=await api("/jobs/research",{method:"POST",body:JSON.stringify({mode:research.mode,queries,excludedKeywords:excludes,startDate:start,endDate:end,todayOnly:false,topCandidates:Number(research.maxCandidates),localOnly:false})});
      const es=new EventSource(API+"/jobs/"+j.id+"/events");
      es.onmessage=e=>{const ev=JSON.parse(e.data);if(ev.type==="progress")setJob({percent:ev.percent,stage:ev.stage});if(ev.type==="error")setError(ev.message);if(ev.type==="complete"){setJob({percent:100,stage:ev.status==="completed"?"Research selesai":ev.error||"Gagal",result:ev.result||null,status:ev.status});es.close();refresh();}};
      es.onerror=()=>es.close();
