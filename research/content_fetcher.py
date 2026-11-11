@@ -1,49 +1,181 @@
 from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit, parse_qs, unquote
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 import re
 
+
 class _ArticleParser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.parts=[]
-        self.skip=0
+        self.parts = []
+        self.skip = 0
+
     def handle_starttag(self, tag, attrs):
-        if tag.lower() in {"script","style","noscript","svg","nav","footer","header","aside","form"}:
+        if tag.lower() in {"script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form"}:
             self.skip += 1
+
     def handle_endtag(self, tag):
-        if tag.lower() in {"script","style","noscript","svg","nav","footer","header","aside","form"} and self.skip:
+        if tag.lower() in {"script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form"} and self.skip:
             self.skip -= 1
+
     def handle_data(self, data):
         if self.skip:
             return
-        value=re.sub(r"\s+"," ",data).strip()
+        value = re.sub(r"\s+", " ", data).strip()
         if value:
             self.parts.append(value)
+
     def text(self):
         return "\n".join(self.parts)
+
+
+class _MetadataParser(HTMLParser):
+    """Extract canonical/og:url metadata from a page."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.candidates = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "meta":
+            return
+        data = {str(k).lower(): str(v).strip() for k, v in attrs if k and v}
+        prop = data.get("property", "").lower()
+        name = data.get("name", "").lower()
+        content = data.get("content", "").strip()
+        if content and (prop in {"og:url", "og:url:url"} or name in {"canonical", "og:url"}):
+            self.candidates.append(content)
+
+
+def _is_google_news_url(url):
+    try:
+        return "news.google.com" in (urlsplit(url).netloc or "").lower()
+    except Exception:
+        return False
+
+
+def _extract_embedded_target(url):
+    """Handle common wrapped URLs that contain the publisher URL in a query parameter."""
+    try:
+        query = parse_qs(urlsplit(url).query)
+        for key in ("url", "u", "q", "target", "dest", "destination"):
+            for value in query.get(key, []):
+                candidate = unquote(value).strip()
+                if candidate.startswith(("http://", "https://")) and not _is_google_news_url(candidate):
+                    return candidate
+    except Exception:
+        pass
+    return None
+
+
+def _request(url, timeout=20):
+    request = Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+    })
+    with urlopen(request, timeout=timeout) as response:
+        raw = response.read()
+        charset = response.headers.get_content_charset() or "utf-8"
+        return raw, charset, getattr(response, "status", 200), response.geturl()
+
+
+def _resolve_source_url(url):
+    """
+    Resolve a Google News wrapper to the publisher URL when possible.
+    urllib follows HTTP redirects automatically. If Google still returns an
+    HTML wrapper, inspect canonical/og:url and common embedded URL parameters.
+    """
+    raw, charset, status, final_url = _request(url)
+    html = raw.decode(charset, errors="replace")
+
+    candidates = []
+    if final_url and not _is_google_news_url(final_url):
+        candidates.append(final_url)
+
+    if _is_google_news_url(final_url) or _is_google_news_url(url):
+        parser = _MetadataParser()
+        parser.feed(html)
+        for candidate in parser.candidates:
+            candidates.append(urljoin(final_url or url, candidate))
+
+        embedded = _extract_embedded_target(url)
+        if embedded:
+            candidates.append(embedded)
+
+        embedded = _extract_embedded_target(final_url)
+        if embedded:
+            candidates.append(embedded)
+
+    # Keep order, remove duplicates and Google wrapper URLs.
+    seen = set()
+    cleaned = []
+    for candidate in candidates:
+        candidate = (candidate or "").strip()
+        if not candidate or _is_google_news_url(candidate):
+            continue
+        if candidate not in seen:
+            seen.add(candidate)
+            cleaned.append(candidate)
+
+    if cleaned:
+        return cleaned[0], raw, charset, status, final_url
+
+    return final_url or url, raw, charset, status, final_url
+
 
 def fetch_article_content(url):
     if not url:
         raise ValueError("URL sumber kosong.")
-    request=Request(url,headers={
-        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-        "Accept":"text/html,application/xhtml+xml"
-    })
+
+    last_error = None
+    candidates = [url]
+
+    # First resolve Google News redirect/wrapper.
     try:
-        with urlopen(request,timeout=20) as response:
-            raw=response.read()
-            charset=response.headers.get_content_charset() or "utf-8"
-    except HTTPError as exc:
-        raise RuntimeError(f"HTTP {exc.code} saat mengambil artikel.") from exc
-    except URLError as exc:
-        raise RuntimeError(f"Gagal mengambil artikel: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise RuntimeError("Timeout 20 detik saat mengambil artikel.") from exc
-    html=raw.decode(charset,errors="replace")
-    parser=_ArticleParser()
-    parser.feed(html)
-    text=re.sub(r"\n{3,}","\n\n",parser.text()).strip()
-    if len(text)<300:
-        raise ValueError("Konten utama artikel tidak terdeteksi atau terlalu pendek.")
-    return text[:30000]
+        resolved_url, raw, charset, status, final_url = _resolve_source_url(url)
+        if resolved_url and resolved_url not in candidates:
+            candidates.insert(0, resolved_url)
+    except Exception as exc:
+        last_error = exc
+
+    # Try resolved publisher URL first, then original URL as a fallback.
+    for candidate in candidates:
+        try:
+            if candidate == url and last_error is not None:
+                # The original request was already attempted by _resolve_source_url.
+                # Avoid an unnecessary second request unless it is not a Google URL.
+                if _is_google_news_url(url):
+                    continue
+
+            raw, charset, status, actual_url = _request(candidate)
+            html = raw.decode(charset, errors="replace")
+
+            parser = _ArticleParser()
+            parser.feed(html)
+            text = re.sub(r"\n{3,}", "\n\n", parser.text()).strip()
+
+            if len(text) < 300:
+                last_error = ValueError(
+                    f"Konten utama artikel tidak terdeteksi atau terlalu pendek "
+                    f"(URL akhir: {actual_url})."
+                )
+                continue
+
+            return {
+                "content": text[:30000],
+                "resolved_url": actual_url,
+                "http_status": status,
+            }
+        except HTTPError as exc:
+            last_error = RuntimeError(f"HTTP {exc.code} saat mengambil artikel ({candidate}).")
+        except URLError as exc:
+            last_error = RuntimeError(f"Gagal mengambil artikel: {exc.reason} ({candidate}).")
+        except TimeoutError:
+            last_error = RuntimeError(f"Timeout 20 detik saat mengambil artikel ({candidate}).")
+        except Exception as exc:
+            last_error = exc
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("Gagal mengambil konten artikel.")
