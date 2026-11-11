@@ -509,8 +509,16 @@ def run_action(action, cfg):
         inserted = 0
         current_rank = query_all("SELECT COALESCE(MAX(rank), 0) AS max_rank FROM production_queue")[0]["max_rank"]
         for rank, story_id in enumerate(ids, int(current_rank or 0) + 1):
-            rows = query_all("SELECT id FROM stories WHERE id = ?", (story_id,))
-            if rows and queue_selected_topic(story_id, rank, 0, 0):
+            rows = query_all(
+                "SELECT id, popularity_score, overall_score FROM stories WHERE id = ? AND ai_score IS NOT NULL",
+                (story_id,),
+            )
+            if rows and queue_selected_topic(
+                story_id,
+                rank,
+                rows[0].get("popularity_score") or 0,
+                rows[0].get("overall_score") or rows[0].get("ai_score") or 0,
+            ):
                 __import__("database.database", fromlist=["get_connection"]).get_connection().execute if False else None
                 inserted += 1
         return {"inserted": inserted, "requested": len(ids)}
