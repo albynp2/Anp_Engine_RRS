@@ -45,7 +45,9 @@ def score_stories(topics):
                 topic["unique_source_count"],
 
             "query_count":
-                topic["query_count"]
+                topic["query_count"],
+            "source_content":
+                (topic.get("source_content") or "")[:2000]
         })
 
     prompt = f"""
@@ -238,11 +240,10 @@ Content Quality berarti:
 BOBOT FINAL
 ==================================================
 
-Research Popularity : 25%
-Horror Strength     : 25%
-Story Potential     : 25%
-Curiosity           : 15%
-Freshness           : 10%
+Source Coverage    : 40%
+Search Relevance   : 30%
+Recency            : 20%
+Source Quality     : 10%
 
 Namun:
 
@@ -318,15 +319,15 @@ PERHITUNGAN
 ==================================================
 
 overall_score =
-(research_popularity * 0.25)
+(source_coverage * 0.40)
 +
-(horror_strength * 0.25)
+(search_relevance * 0.30)
 +
-(story_potential * 0.25)
+(recency * 0.20)
 +
-(curiosity * 0.15)
+(source_quality * 0.10)
 +
-(freshness * 0.10)
+(source_quality * 0.10)
 
 Kemudian terapkan Content Quality Gate:
 
@@ -358,11 +359,12 @@ Format:
     "top_10": [
         {{
             "id": 1,
+            "source_coverage": 0,
+            "search_relevance": 0,
+            "recency": 0,
+            "source_quality": 0,
             "horror_strength": 0,
             "story_potential": 0,
-            "curiosity": 0,
-            "uniqueness": 0,
-            "freshness": 0,
             "content_quality": 0,
             "overall_score": 0,
             "reason": "alasan singkat"
