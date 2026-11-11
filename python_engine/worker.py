@@ -529,6 +529,30 @@ def run_action(action, cfg):
         return run_generate(cfg)
     if action == "generate_bulk":
         return run_generate_bulk(cfg)
+    if action == "delete_story":
+        from database.database import delete_story
+        return delete_story(cfg.get("storyId"))
+
+    if action == "ai_status":
+        key = str(os.getenv("OPENAI_API_KEY") or "").strip()
+        if not key:
+            return {"connected": False, "status": "missing_key", "message": "OPENAI_API_KEY belum dikonfigurasi."}
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=key)
+            client.models.list()
+            return {"connected": True, "status": "connected", "message": "OpenAI API terhubung."}
+        except Exception as exc:
+            message = str(exc)
+            status = "error"
+            if "401" in message or "invalid_api_key" in message.lower() or "incorrect api key" in message.lower():
+                status = "invalid_key"
+                message = "OpenAI API key tidak valid."
+            elif "429" in message or "quota" in message.lower() or "rate limit" in message.lower():
+                status = "quota_or_rate_limit"
+                message = "OpenAI terhubung, tetapi quota/rate limit bermasalah."
+            return {"connected": False, "status": status, "message": message[:300]}
+
     if action == "content_settings":
         return get_content_settings()
     if action == "save_content_settings":
