@@ -59,7 +59,7 @@ function App(){
   {page==="Dashboard"&&<Dashboard dash={dash} setPage={setPage}/>}
   {page==="Research RRS"&&<Research research={research} setResearch={setResearch} runResearch={runResearch} busy={busy}/>}
   {page==="Article Gallery"&&<Gallery articles={articles} search={articleSearch} setSearch={setArticleSearch} status={statusFilter} setStatus={setStatusFilter} selected={selected} setSelected={setSelected} onQueue={selectArticles} onDelete={deleteArticle}/>} 
-  {page==="Production Queue"&&<Queue queue={queue} generate={generate}/>}
+  {page==="Production Queue"&&<Queue queue={queue} generate={generate} remove={removeQueueItem}/>}
   {page==="Story Writer"&&<Writer scripts={scripts} queue={queue} generate={generate}/>}
   {page==="Content Management"&&<Content content={content} setContent={setContent} avatars={avatars} music={music} templates={templates} scripts={scripts} save={saveContent} />}
   {page==="Settings"&&<Settings avatars={avatars} setAvatars={setAvatars} form={avatarForm} setForm={setAvatarForm} music={music} refresh={refresh}/>}
