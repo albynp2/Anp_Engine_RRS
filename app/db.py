@@ -271,7 +271,7 @@ def _script_row(r: Optional[dict]) -> Optional[dict]:
 
 def get_script(story_id: int) -> Optional[dict]:
     return _script_row(q_one("""
-        SELECT g.*, s.source, s.url, s.published, s.stage, s.title AS news_title
+        SELECT g.*, s.source, s.url, s.published, s.published_date, s.stage, s.title AS news_title
         FROM generated_stories g JOIN v_stories s ON s.id = g.story_id WHERE g.story_id = ?""",
                              (story_id,)))
 
@@ -279,7 +279,7 @@ def get_script(story_id: int) -> Optional[dict]:
 def list_scripts() -> List[dict]:
     rows = q_all("""
         SELECT g.story_id, g.title, g.hook, g.created_at, g.updated_at, g.fact_warnings,
-               g.segments_json, s.source, s.url, s.stage, s.title AS news_title
+               g.segments_json, s.source, s.url, s.published, s.published_date, s.stage, s.title AS news_title
         FROM generated_stories g JOIN v_stories s ON s.id = g.story_id
         ORDER BY g.updated_at DESC, g.id DESC""")
     out = []
