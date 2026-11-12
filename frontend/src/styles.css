@@ -108,3 +108,6 @@ header h1{margin:5px 0 0;font-size:25px;letter-spacing:-.02em}
 .article-actions{display:flex;align-items:center;gap:14px;margin-top:13px}
 .delete-btn{border:1px solid rgba(241,91,100,.35);background:rgba(130,32,42,.16);color:#ff9298;border-radius:7px;padding:5px 9px;font-size:9px;cursor:pointer}
 .delete-btn:hover{background:rgba(180,48,59,.28);border-color:rgba(241,91,100,.65)}
+
+.success{background:rgba(25,110,78,.22);border:1px solid rgba(95,224,161,.4);padding:12px 15px;border-radius:10px;margin-bottom:15px;color:#b9f5d8}.success button{float:right;border:0;background:none;color:#fff}
+.preview-script{padding:15px 0}.script-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}.script-head b{display:block;color:#eef5fb;font-size:13px}.script-head small{display:block;color:#71869a;margin-top:5px;font-size:9px}.script-part{margin-top:14px}.script-part label{display:block;color:#687f93;font-size:8px;font-weight:700;letter-spacing:.12em;margin-bottom:7px}.script-part p{margin:0}.script-preview{margin:0;white-space:pre-wrap;word-break:break-word;max-height:430px;overflow:auto;background:#08131c;border:1px solid #1d3344;border-radius:9px;padding:14px;color:#dce7ef;font:11px/1.7 Consolas,Monaco,monospace}.script-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
