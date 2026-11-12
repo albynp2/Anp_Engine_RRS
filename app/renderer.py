@@ -507,7 +507,7 @@ def prepare_assets(job: Job, story: dict, script: dict, opts: dict, char: Option
         progress(0.45 + 0.5 * len(imgs) / len(set(group)), f"Gambar scene {len(imgs) + 1}/{len(set(group))}")
         prompt = segs[j].get("image_prompt") or "dark empty street at night, fog, cinematic"
         imgs[g] = images.scene_image(prompt, sid, opts["imageProvider"], segs[j]["emotion"], g,
-                                     w=min(W, 720), h=min(H, 1280), log=job.log)
+                                     w=min(W, 720), h=min(H, 1280), log=job.log, source_url=script.get("url") or "")
     total_frames = int(math.ceil(total * fps))
     env = audio.mouth_signals(arr, audio.SR, fps, total_frames)
     return {"wav": wav, "total": total, "times": times, "starts": starts, "ends": ends, "group": group,
