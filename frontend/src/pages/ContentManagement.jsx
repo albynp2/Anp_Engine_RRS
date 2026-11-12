@@ -127,7 +127,8 @@ export function ContentManagement({ go, onError }) {
   const firstScript = o ? (scripts.find((s) => sel.has(s.story_id)) || scripts[0]) : null;
   const makePreview = async () => {
     try {
-      const blob = await api('/render/preview', { method: 'POST', body: { ...o, title: firstScript ? firstScript.title : '', text: firstScript ? firstScript.hook : '', emotion: emo, level: 0.8 } });
+      const previewOpts = { ...o, newsSource: { ...(o.newsSource || {}), source: o.newsSource?.mode === 'manual' ? (o.newsSource?.source || '') : (firstScript?.source || ''), date: o.newsSource?.mode === 'manual' ? (o.newsSource?.date || '') : ((firstScript?.published || '').slice(0, 10)) } };
+      const blob = await api('/render/preview', { method: 'POST', body: { ...previewOpts, title: firstScript ? firstScript.title : '', text: firstScript ? firstScript.hook : '', emotion: emo, level: 0.8 } });
       setPreview((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
     } catch (e) { setLive(false); onError(e.message); }
   };
@@ -286,6 +287,30 @@ export function ContentManagement({ go, onError }) {
             <label>Kualitas</label>
             <select value={o.quality} onChange={(e) => set('quality', e.target.value)}>
               <option value="hd">HD 1080×1920 · 30 fps (hasil akhir)</option><option value="draft">Draft 540×960 · 24 fps (cepat, untuk tes)</option></select>
+          </div>
+
+          <div className="card form-card">
+            <div className="card-heading"><div><h3>9. Sumber berita</h3><p>Tampilkan asal berita dan tanggal terbit di video.</p></div></div>
+            <label className="check-label"><input type="checkbox" checked={o.newsSource?.enabled !== false} onChange={(e) => setG('newsSource')({ enabled: e.target.checked })} />Tampilkan sumber berita</label>
+            {o.newsSource?.enabled !== false && (<>
+              <label>Sumber data</label>
+              <div className="radio-cards">
+                <div className={'radio-card ' + (o.newsSource?.mode === 'script' ? 'on' : '')} onClick={() => setG('newsSource')({ mode: 'script' })}><b>Dari naskah</b><small>Otomatis mengambil media dan tanggal berita.</small></div>
+                <div className={'radio-card ' + (o.newsSource?.mode === 'manual' ? 'on' : '')} onClick={() => setG('newsSource')({ mode: 'manual' })}><b>Input manual</b><small>Isi sendiri sumber dan tanggal.</small></div>
+              </div>
+              {o.newsSource?.mode === 'manual' && (<div className="form-row">
+                <div><label>Nama sumber berita</label><input className="wide" placeholder="Contoh: Kompas.com" value={o.newsSource?.source || ''} onChange={(e) => setG('newsSource')({ source: e.target.value })} /></div>
+                <div><label>Tanggal terbit</label><input type="date" className="wide" value={o.newsSource?.date || ''} onChange={(e) => setG('newsSource')({ date: e.target.value })} /></div>
+              </div>)}
+              <div className="form-row">
+                <div><label>Posisi sumber</label>
+                  <select value={o.newsSource?.position || 'bottom-left'} onChange={(e) => setG('newsSource')({ position: e.target.value })}>
+                    {['top-left','top-center','top-right','bottom-left','bottom-center','bottom-right'].map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <Slide label="Ukuran teks" value={o.newsSource?.size || 2} min={1.2} max={4} step={0.1} unit="%" onChange={(x) => setG('newsSource')({ size: x })} />
+              </div>
+            </>)}
           </div>
         </div>
 

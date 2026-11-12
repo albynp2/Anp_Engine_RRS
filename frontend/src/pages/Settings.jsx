@@ -31,7 +31,7 @@ function CharacterEditor({ char, voices, tips, onSaved, onDeleted, onError }) {
   const save = async () => {
     try {
       const r = await api(`/characters/${c.id}`, { method: 'PUT', body: { name: c.name, voice: c.voice, height_pct: c.height_pct, mouth_x: c.mouth_x, mouth_y: c.mouth_y, mouth_w: c.mouth_w, frame_style: c.frame_style } });
-      onSaved({ ...r, _v: Date.now() });
+      onSaved({ ...r, _v: Date.now() }, 'Data karakter berhasil tersimpan.');
     } catch (e) { onError(e.message); }
   };
   const pick = (e) => {
@@ -40,7 +40,7 @@ function CharacterEditor({ char, voices, tips, onSaved, onDeleted, onError }) {
   };
   const copy = async (key, text) => { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(''), 1400); };
   const emotions = ['neutral', 'serious', 'sad', 'angry', 'scared', 'surprised', 'happy'];
-  const shown = showAll ? emotions : ['neutral', 'sad', 'angry', 'surprised'];
+  const shown = showAll ? emotions : ['neutral', 'sad', 'angry', 'surprised', 'happy'];
   const variant = (emo, mouth) => tips.variant.replace('{emosi}', tips.emotions[emo]).replace('{mulut}', tips.mouths[mouth]);
   return (
     <div className="card form-card" style={{ marginBottom: 14 }}>
@@ -94,13 +94,14 @@ export function Settings({ onError }) {
   const [health, setHealth] = useState(null);
   const [newName, setNewName] = useState('');
   const [mf, setMf] = useState({ name: '', source: '', license_note: '', confirm: false, file: null });
+  const [notice, setNotice] = useState('');
   const loadChars = () => api('/characters').then((d) => setChars(d.items)).catch((e) => onError(e.message));
   const loadTracks = () => api('/music').then((d) => setTracks(d.items)).catch((e) => onError(e.message));
   useEffect(() => { loadChars(); loadTracks(); api('/health').then(setHealth).catch(() => {}); }, []);
 
-  const replace = (c) => setChars((list) => list.map((x) => (x.id === c.id ? { ...c, _v: c._v || Date.now() } : x)));
+  const replace = (c, message = '') => { setChars((list) => list.map((x) => (x.id === c.id ? { ...c, _v: Date.now() } : x))); if (message) { setNotice(message); setTimeout(() => setNotice(''), 2200); } };
   const create = async () => {
-    try { const c = await api('/characters', { method: 'POST', body: { name: newName } }); setNewName(''); setChars((l) => [...l, c]); }
+    try { const c = await api('/characters', { method: 'POST', body: { name: newName } }); setNewName(''); setChars((l) => [...l, c]); setNotice('Karakter berhasil ditambahkan.'); setTimeout(() => setNotice(''), 2200); }
     catch (e) { onError(e.message); }
   };
   const addMusic = async () => {
@@ -113,6 +114,7 @@ export function Settings({ onError }) {
   return (
     <>
       <div className="page-heading"><div><div className="eyebrow">SETTINGS</div><h1>Pengaturan</h1><p>Karakter avatar, library musik, dan status sistem.</p></div></div>
+      {notice && <div className="ok-box" style={{ position: 'sticky', top: 72, zIndex: 20, marginBottom: 12 }}>✓ {notice}</div>}
 
       <div className="card settings-card" style={{ marginBottom: 16 }}>
         <div className="card-heading"><div><h3>Status sistem</h3><p>API key hanya dibaca dari file .env, tidak pernah tampil di sini</p></div></div>

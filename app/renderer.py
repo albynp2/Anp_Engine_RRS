@@ -36,6 +36,8 @@ DEFAULT_OPTS = {
                  "strokeColor": "#000000", "strokeWidth": 0, "box": True, "boxColor": "#000000",
                  "boxOpacity": 60, "uppercase": False, "x": 50, "y": None, "width": 86, "maxLines": 3},
     "watermarkText": "", "watermarkOpacity": 30, "watermarkPosition": "top-right", "watermarkImagePath": "",
+    "newsSource": {"enabled": True, "mode": "script", "source": "", "date": "", "position": "bottom-left",
+                   "color": "#ffffff", "strokeColor": "#000000", "strokeWidth": 8, "size": 2.0},
 }
 NESTED = ("avatar", "subtitle", "headline")
 QUALITY = {"hd": (1080, 1920, 30), "draft": (540, 960, 24)}
@@ -339,6 +341,7 @@ class Composer:
             self.head = (layer, x, y)
 
         self.wm = self._watermark(opts)
+        self.news_source = self._news_source(opts)
 
     def _watermark(self, o):
         op = max(0, min(100, int(num(o.get("watermarkOpacity"), 30)))) / 100
@@ -362,6 +365,41 @@ class Composer:
               "center": ((self.W - lw) // 2, (self.H - lh) // 2),
               "bottom-left": (m, bottom), "bottom-right": (self.W - lw - m, bottom)}
         return layer, xy.get(pos, xy["top-right"])
+
+    def _news_source(self, o):
+        ns = o.get("newsSource") or {}
+        if not ns.get("enabled", True):
+            return None
+        source = (ns.get("source") or "").strip()
+        date = (ns.get("date") or "").strip()
+        if not source and not date:
+            return None
+        parts = []
+        if source:
+            parts.append(f"Sumber: {source[:80]}")
+        if date:
+            parts.append(f"Terbit: {date[:40]}")
+        text = "\n".join(parts)
+        size = max(12, int(self.H * num(ns.get("size"), 2.0) / 100))
+        layer = text_layer(text, size, int(self.W * 0.62),
+                           {"color": ns.get("color", "#ffffff"),
+                            "strokeColor": ns.get("strokeColor", "#000000"),
+                            "strokeWidth": ns.get("strokeWidth", 8),
+                            "box": True, "boxColor": "#000000", "boxOpacity": 45,
+                            "uppercase": False}, 2)
+        m = int(self.W * 0.04)
+        pos = ns.get("position", "bottom-left")
+        safe_top = int(self.H * self.pf["safe_top"]) + m
+        safe_bottom = int(self.H * (1 - self.pf["safe_bottom"])) - layer.height - m
+        xy = {
+            "top-left": (m, safe_top),
+            "top-center": ((self.W - layer.width) // 2, safe_top),
+            "top-right": (self.W - layer.width - m, safe_top),
+            "bottom-left": (m, safe_bottom),
+            "bottom-center": ((self.W - layer.width) // 2, safe_bottom),
+            "bottom-right": (self.W - layer.width - m, safe_bottom),
+        }
+        return layer, xy.get(pos, xy["bottom-left"])
 
     def overlay(self, emo: str) -> Image.Image:
         if emo not in self.overlays:
@@ -406,6 +444,8 @@ class Composer:
             bg.paste(self.head[0], (self.head[1], self.head[2]), self.head[0])
         if self.wm:
             bg.paste(self.wm[0], self.wm[1], self.wm[0])
+        if self.news_source:
+            bg.paste(self.news_source[0], self.news_source[1], self.news_source[0])
         for t0, t1, layer, x, y in sc.chunks:
             if t0 <= t < t1 + 0.05:
                 bg.paste(layer, (x, y), layer)
@@ -467,7 +507,7 @@ def prepare_assets(job: Job, story: dict, script: dict, opts: dict, char: Option
         progress(0.45 + 0.5 * len(imgs) / len(set(group)), f"Gambar scene {len(imgs) + 1}/{len(set(group))}")
         prompt = segs[j].get("image_prompt") or "dark empty street at night, fog, cinematic"
         imgs[g] = images.scene_image(prompt, sid, opts["imageProvider"], segs[j]["emotion"], g,
-                                     w=min(W, 720), h=min(H, 1280), log=job.log)
+                                     w=min(W, 720), h=min(H, 1280), log=job.log, source_url=script.get("url") or "")
     total_frames = int(math.ceil(total * fps))
     env = audio.mouth_signals(arr, audio.SR, fps, total_frames)
     return {"wav": wav, "total": total, "times": times, "starts": starts, "ends": ends, "group": group,
@@ -559,7 +599,13 @@ def run_render(job: Job, p: dict) -> dict:
             job.set_progress(base + share * (lo + (hi - lo) * frac), f"[{k + 1}/{len(ids)}] {stage}")
 
         try:
-            a = prepare_assets(job, {"id": sid}, script, opts, char, W, H, fps, prog)
+            story_opts = copy.deepcopy(opts)
+            ns = copy.deepcopy(story_opts.get("newsSource") or {})
+            if ns.get("mode", "script") == "script":
+                ns["source"] = script.get("source") or script.get("news_source") or ""
+                ns["date"] = (script.get("published_date") or script.get("published") or "")[:10]
+            story_opts["newsSource"] = ns
+            a = prepare_assets(job, {"id": sid}, script, story_opts, char, W, H, fps, prog)
         except Cancelled:
             raise
         except Exception as e:
@@ -574,7 +620,7 @@ def run_render(job: Job, p: dict) -> dict:
             lo = 0.35 + 0.65 * pi / len(plats)
             hi = 0.35 + 0.65 * (pi + 1) / len(plats)
             try:
-                comp = Composer(W, H, fps, plat, opts, scenes, a["env"], char, script["title"] or "")
+                comp = Composer(W, H, fps, plat, story_opts, scenes, a["env"], char, script["title"] or "")
                 encode(comp, a, out, fps, mpath, mvol, job,
                        lambda f, plat=plat, lo=lo, hi=hi: prog(f, f"Render {PLATFORMS[plat]['label']}", lo=lo, hi=hi))
                 db.finish_video(vid, True, out.name, a["total"])

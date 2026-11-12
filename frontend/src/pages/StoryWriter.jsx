@@ -52,7 +52,7 @@ export function StoryWriter({ go, onError }) {
               <button key={s.story_id} className="script-item" onClick={() => open(s.story_id)}
                 style={cur && cur.story_id === s.story_id ? { background: '#1a2430' } : null}>
                 <span className="script-icon"><FileText size={15} /></span>
-                <span><b>{s.title}</b><small>{s.source} · {s.words} kata · {s.segment_count} segmen</small></span>
+                <span><b>{s.title}</b><small>{s.source} · terbit {(s.published_date || s.published || '').slice(0, 10) || '—'} · {s.words} kata · {s.segment_count} segmen</small></span>
                 {s.fact_warnings && s.fact_warnings.length > 0 && <AlertTriangle size={14} color="#ffb86b" />}
               </button>
             ))}
@@ -62,10 +62,11 @@ export function StoryWriter({ go, onError }) {
           {!cur && <div className="empty-small">Pilih naskah di sebelah kiri.</div>}
           {cur && (<>
             <div className="card-heading"><div><h3>Edit naskah</h3>
-              <p>Perkiraan durasi {cur.estimated_seconds} detik · <StageBadge stage={cur.stage} /> · <a href={cur.url} target="_blank" rel="noreferrer" style={{ color: '#6baaff' }}><ExternalLink size={10} /> sumber: {cur.source}</a></p></div></div>
+              <p>Perkiraan durasi {cur.estimated_seconds} detik · <StageBadge stage={cur.stage} /> · <span className="badge blue">Sumber: {cur.source || '—'}</span> · <span className="badge">Terbit: {(cur.published_date || cur.published || '').slice(0, 10) || '—'}</span> · <a href={cur.url} target="_blank" rel="noreferrer" style={{ color: '#6baaff' }}><ExternalLink size={10} /> sumber: {cur.source}</a></p></div></div>
             {cur.fact_warnings && cur.fact_warnings.length > 0
               ? <div className="warn-box"><b><AlertTriangle size={13} /> Periksa — kata/angka ini tidak ditemukan di artikel sumber:</b><br />{cur.fact_warnings.join(', ')}<br /><small>Bisa jadi salah tulis atau tambahan AI. Hapus/ubah kalau memang tidak ada di berita.</small></div>
               : <div className="ok-box">Cek fakta otomatis: semua nama & angka di naskah ditemukan di artikel sumber.</div>}
+            <div className="ok-box" style={{ marginBottom: 12 }}><b>Sumber berita</b><br />{cur.source || '—'} · terbit {(cur.published_date || cur.published || '').slice(0, 10) || '—'}<br /><small>Metadata ini ikut dibawa ke Content Management dan dapat ditampilkan di video.</small></div>
             <label>Judul video</label>
             <input className="wide" value={cur.title || ''} onChange={(e) => edit({ title: e.target.value })} />
             <label>Segmen narasi <span>satu segmen = satu bagian suara & satu gambar</span></label>
