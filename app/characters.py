@@ -1,6 +1,7 @@
 """Karakter avatar: gambar per emosi (mulut tertutup/terbuka), posisi mulut, suara default."""
 import io
 import shutil
+from collections import deque
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -93,6 +94,45 @@ def delete(cid: int):
     shutil.rmtree(_dir(cid), ignore_errors=True)
 
 
+def _remove_flat_background(img: Image.Image) -> Image.Image:
+    """Make an edge-connected near-white/neutral background fully transparent.
+    Keeps interior white details because only pixels connected to the image border are removed.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    visited = bytearray(w * h)
+    q = deque()
+    tol = 42
+    for x in range(w):
+        q.append((x, 0)); q.append((x, h - 1))
+    for y in range(1, h - 1):
+        q.append((0, y)); q.append((w - 1, y))
+    def bg_like(r, g, b, a):
+        if a < 20:
+            return True
+        mx, mn = max(r, g, b), min(r, g, b)
+        return mx >= 225 and (mx - mn) <= 28
+    while q:
+        x, y = q.popleft()
+        i = y * w + x
+        if visited[i]:
+            continue
+        visited[i] = 1
+        r, g, b, a = px[x, y]
+        if not bg_like(r, g, b, a):
+            continue
+        px[x, y] = (r, g, b, 0)
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < w and 0 <= ny < h:
+                j = ny * w + nx
+                if not visited[j]:
+                    nr, ng, nb, na = px[nx, ny]
+                    if bg_like(nr, ng, nb, na) or max(abs(nr-r), abs(ng-g), abs(nb-b)) <= tol:
+                        q.append((nx, ny))
+    return img
+
+
 def save_image(cid: int, emotion: str, mouth: str, data: bytes):
     if emotion not in EMOTIONS or mouth not in MOUTHS:
         raise ValueError("Emosi/mulut tidak valid")
@@ -101,7 +141,7 @@ def save_image(cid: int, emotion: str, mouth: str, data: bytes):
         img.load()
     except Exception:
         raise ValueError("File bukan gambar yang valid")
-    img = img.convert("RGBA")
+    img = _remove_flat_background(img.convert("RGBA"))
     if img.height > 1600:
         img = img.resize((int(img.width * 1600 / img.height), 1600), Image.LANCZOS)
     _dir(cid).mkdir(parents=True, exist_ok=True)
