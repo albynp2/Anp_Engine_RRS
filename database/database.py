@@ -224,7 +224,7 @@ def queue_selected_topic(
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT OR IGNORE INTO production_queue
+        INSERT INTO production_queue
         (
             story_id,
             rank,
@@ -232,6 +232,14 @@ def queue_selected_topic(
             overall_score
         )
         VALUES (?, ?, ?, ?)
+        ON CONFLICT(story_id) DO UPDATE SET
+            overall_score = COALESCE(excluded.overall_score, production_queue.overall_score),
+            research_popularity = COALESCE(excluded.research_popularity, production_queue.research_popularity),
+            status = CASE
+                WHEN production_queue.status IN ('FAILED','PUBLISHED','RENDERED') THEN production_queue.status
+                ELSE 'SELECTED'
+            END,
+            selected_at = CURRENT_TIMESTAMP
     """, (
         story_id,
         rank,
@@ -240,8 +248,7 @@ def queue_selected_topic(
     ))
 
     inserted = cursor.rowcount > 0
-    if inserted:
-        cursor.execute("UPDATE stories SET status='SELECTED', used_at=CURRENT_TIMESTAMP WHERE id=?", (story_id,))
+    cursor.execute("UPDATE stories SET status='SELECTED', used_at=CURRENT_TIMESTAMP WHERE id=?", (story_id,))
 
     conn.commit()
     conn.close()
