@@ -37,7 +37,7 @@ export default function App() {
   const props = { go, onError: setError };
   const view = {
     dashboard: <Dashboard {...props} />, research: <Research {...props} />, gallery: <Gallery {...props} />,
-    queue: <Queue {...props} />, writer: <StoryWriter {...props} />, content: <ContentManagement {...props} />,
+    queue: <Queue {...props} />, writer: <StoryWriter {...props} />, content: <ContentManagement {...props} />, album: <Album {...props} />,
     settings: <Settings {...props} />,
   }[page] || <Dashboard {...props} />;
   const label = (NAV.find((n) => n[0] === page) || NAV[0])[1];
