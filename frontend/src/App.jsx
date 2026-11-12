@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Clapperboard, FileText, Images, ListChecks, Search, Settings as Cog, Skull } from 'lucide-react';
+import { BarChart3, Clapperboard, FileText, Images, ListChecks, Search, Settings as Cog, Skull, Film } from 'lucide-react';
 import { api, ErrorModal } from './ui.jsx';
 import { Dashboard, Research } from './pages/DashboardResearch.jsx';
 import { Gallery, Queue } from './pages/GalleryQueue.jsx';
 import { StoryWriter } from './pages/StoryWriter.jsx';
 import { ContentManagement } from './pages/ContentManagement.jsx';
 import { Settings } from './pages/Settings.jsx';
+import { Album } from './pages/Album.jsx';
 
 const NAV = [
   ['dashboard', 'Dashboard', BarChart3],
@@ -14,6 +15,7 @@ const NAV = [
   ['queue', 'Production Queue', ListChecks],
   ['writer', 'Story Writer', FileText],
   ['content', 'Content Management', Clapperboard],
+  ['album', 'Album', Film],
   ['settings', 'Settings', Cog],
 ];
 
