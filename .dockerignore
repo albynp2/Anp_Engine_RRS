@@ -1,12 +1,7 @@
-node_modules
+data
+.env
 frontend/node_modules
 frontend/dist
-__pycache__
+**/__pycache__
 *.pyc
-.env
 .git
-data
-media
-output
-*.db
-*.sqlite

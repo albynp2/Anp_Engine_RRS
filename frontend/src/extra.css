@@ -1,0 +1,32 @@
+/* Tambahan v3 */
+.chk-cell{width:32px}.chk-cell input{accent-color:#f04452}
+.stage-NEW{background:#1d2a37;color:#a9b8c8}.stage-QUEUED{background:#3f2c1d;color:#ffb86b}.stage-WRITTEN{background:#302144;color:#c3a0ff}
+.stage-RENDERING{background:#162f49;color:#78baff}.stage-RENDERED{background:#162f49;color:#78baff}.stage-PUBLISHED{background:#12372d;color:#53dca7}
+.score{font:600 12px 'Space Grotesk';color:#f3f6fa}.score small{display:block;font:400 9px 'DM Sans';color:#718398}
+.sticky-actions{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;margin:14px -4px 0;border:1px solid #34404d;border-radius:12px;background:#0b121af2;backdrop-filter:blur(10px);z-index:5}
+.radio-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.radio-card{border:1px solid #293846;background:#0a121b;border-radius:10px;padding:12px;cursor:pointer;font-size:11px;color:#cbd5e1}
+.radio-card.on{border-color:#e83349;background:#2a1822}.radio-card b{display:block;margin-bottom:4px}.radio-card small{color:#7f90a3;font-size:10px;line-height:1.5}
+.seg-row{display:grid;grid-template-columns:28px 1fr 130px 32px;gap:8px;align-items:start;padding:10px 0;border-bottom:1px solid #1e2a36}
+.seg-row textarea,.seg-row input,.seg-row select,.form-card .wide{width:100%;border:1px solid #293846;background:#0a121b;color:#dce5ef;border-radius:8px;padding:8px;font-size:11px;outline:none}
+.seg-row textarea{resize:vertical;min-height:58px;line-height:1.55}.seg-row .n{width:24px;height:24px;border-radius:7px;background:#241923;color:#ff7884;display:grid;place-items:center;font-size:10px;font-weight:700}
+.seg-row .img{grid-column:2/4;font-size:10px;color:#8a9aad}
+.warn-box{border:1px solid #6e4a25;background:#2d2014;color:#ffcf9a;border-radius:10px;padding:12px;font-size:11px;line-height:1.6;margin:12px 0}
+.ok-box{border:1px solid #254136;background:#10231f;color:#84e0bb;border-radius:10px;padding:10px 12px;font-size:11px;margin:12px 0}
+.copy-area{width:100%;min-height:170px;border:1px solid #293846;background:#070c12;color:#c9d4e0;border-radius:9px;padding:10px;font:11px/1.6 ui-monospace,Consolas,monospace;resize:vertical}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:11px;color:#a9b6c5}.kv b{color:#e2e8f0}
+.avatar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px}
+.av-slot{border:1px dashed #394a5c;border-radius:10px;padding:8px;background:#0a121b;text-align:center;font-size:10px;color:#8a9aad}
+.av-slot img{width:100%;height:110px;object-fit:contain;background:repeating-conic-gradient(#141d28 0 25%,#0e1620 0 50%) 0 0/16px 16px;border-radius:7px;margin-bottom:6px}
+.av-slot .ph{height:110px;display:grid;place-items:center;margin-bottom:6px;border-radius:7px;background:#0d151e}
+.av-slot label{display:inline-block;margin-top:4px;padding:5px 8px;border-radius:7px;background:#111b26;border:1px solid #293948;cursor:pointer;color:#d4deea}
+.av-slot input[type=file]{display:none}
+.mouth-pick{position:relative;display:inline-block;cursor:crosshair;border:1px solid #394a5c;border-radius:10px;overflow:hidden;background:repeating-conic-gradient(#141d28 0 25%,#0e1620 0 50%) 0 0/16px 16px}
+.mouth-pick img{display:block;max-height:300px;max-width:100%}.mouth-pick i{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #ff4657;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #000a}
+.preview-img{width:100%;max-width:300px;border-radius:12px;border:1px solid #394a5c;display:block;margin:12px auto}
+.video-card{display:grid;grid-template-columns:120px 1fr;gap:14px;padding:14px 0;border-bottom:1px solid #202d39}
+.video-card video{width:120px;border-radius:8px;background:#000;aspect-ratio:9/16;object-fit:cover}
+.tag-row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+@media(max-width:850px){.grid-2,.grid-3,.radio-cards{grid-template-columns:1fr}.seg-row{grid-template-columns:24px 1fr}.seg-row>*:nth-child(3),.seg-row>*:nth-child(4){grid-column:2}}
+.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.form-card select.wide,.form-card input.wide{width:100%}

@@ -1,96 +1,74 @@
-import React,{useEffect,useMemo,useState}from"react";
-import"./styles.css";
+import React, { useEffect, useState } from 'react';
+import { BarChart3, Clapperboard, FileText, Images, ListChecks, Search, Settings as Cog, Skull } from 'lucide-react';
+import { api, ErrorModal } from './ui.jsx';
+import { Dashboard, Research } from './pages/DashboardResearch.jsx';
+import { Gallery, Queue } from './pages/GalleryQueue.jsx';
+import { StoryWriter } from './pages/StoryWriter.jsx';
+import { ContentManagement } from './pages/ContentManagement.jsx';
+import { Settings } from './pages/Settings.jsx';
 
-const API="http://127.0.0.1:3001/api";
-const menus=["Dashboard","Research RRS","Article Gallery","Production Queue","Story Writer","Content Management","Settings"];
-const horrorQueries=["kisah horor nyata Indonesia","cerita mistis Indonesia","kejadian misterius Indonesia","pengalaman horor Indonesia","urban legend Indonesia","misteri Indonesia","kejadian aneh Indonesia","penampakan Indonesia","kasus misterius Indonesia","kejadian mengerikan Indonesia","kasus pembunuhan misterius Indonesia","crime mystery Indonesia"];
-const excludeDefaults=["film","trailer","game","netflix","bioskop","sinopsis"];
+const NAV = [
+  ['dashboard', 'Dashboard', BarChart3],
+  ['research', 'Research RRS', Search],
+  ['gallery', 'Artikel Gallery', Images],
+  ['queue', 'Production Queue', ListChecks],
+  ['writer', 'Story Writer', FileText],
+  ['content', 'Content Management', Clapperboard],
+  ['settings', 'Settings', Cog],
+];
 
-async function api(path,opts={}){
-  const r=await fetch(API+path,{headers:{"Content-Type":"application/json"},...opts});
-  const d=await r.json();
-  if(!r.ok)throw new Error(d.error||"Request gagal");
-  return d;
+export default function App() {
+  const [page, setPage] = useState(() => (location.hash.slice(1) || 'dashboard'));
+  const [error, setError] = useState('');
+  const [health, setHealth] = useState(null);
+  const go = (p) => { setPage(p); location.hash = p; window.scrollTo(0, 0); };
+
+  useEffect(() => {
+    const t = () => api('/health').then(setHealth).catch(() => setHealth(null));
+    t();
+    const i = setInterval(t, 20000);
+    const onHash = () => setPage(location.hash.slice(1) || 'dashboard');
+    window.addEventListener('hashchange', onHash);
+    return () => { clearInterval(i); window.removeEventListener('hashchange', onHash); };
+  }, []);
+
+  const props = { go, onError: setError };
+  const view = {
+    dashboard: <Dashboard {...props} />, research: <Research {...props} />, gallery: <Gallery {...props} />,
+    queue: <Queue {...props} />, writer: <StoryWriter {...props} />, content: <ContentManagement {...props} />,
+    settings: <Settings {...props} />,
+  }[page] || <Dashboard {...props} />;
+  const label = (NAV.find((n) => n[0] === page) || NAV[0])[1];
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand"><div className="brand-mark"><Skull size={22} /></div>
+          <div><b>RRS</b><strong>ENGINE</strong><small>NEWS → SCRIPT → VIDEO</small></div></div>
+        <nav>
+          {NAV.map(([id, text, Icon]) => (
+            <button key={id} className={`nav-item ${page === id ? 'active' : ''}`} onClick={() => go(id)}>
+              <Icon size={16} /><span>{text}</span></button>))}
+        </nav>
+        <div className="side-bottom">
+          <div className="sys-mini">
+            <div className="sys-head"><span>Sistem</span></div>
+            <div><i className={`dot ${health ? 'green' : 'red'}`} /> Server <b>{health ? 'online' : 'offline'}</b></div>
+            <div><i className={`dot ${health && health.openai ? 'green' : 'red'}`} /> OpenAI <b>{health && health.openai ? 'siap' : 'belum'}</b></div>
+            <div><i className={`dot ${health && health.ffmpeg ? 'green' : 'red'}`} /> FFmpeg <b>{health && health.ffmpeg ? 'siap' : 'tidak ada'}</b></div>
+          </div>
+          <span className="version">v3.0 · LOCAL DOCKER</span>
+        </div>
+      </aside>
+      <div className="main">
+        <header className="topbar">
+          <div className="crumb"><span>RRS</span> / <b>{label}</b></div>
+          <div className="top-actions"><div className="api-pill"><i className={`dot ${health ? 'green' : 'red'}`} />
+            {health ? `${health.tz} · ${health.now.slice(11, 16)}` : 'server offline'}</div></div>
+        </header>
+        <main className="content">{view}</main>
+      </div>
+      <ErrorModal error={error} onClose={() => setError('')} />
+    </div>
+  );
 }
-function readFile(file){
-  return new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=reject;fr.readAsDataURL(file)});
-}
-function Badge({children}){return <span className={"badge "+String(children||"").toLowerCase().replaceAll(" ","-")}>{children||"—"}</span>}
-function App(){
- const[page,setPage]=useState("Dashboard"),[dash,setDash]=useState(null),[articles,setArticles]=useState({items:[],total:0}),[queue,setQueue]=useState([]),[scripts,setScripts]=useState([]),[avatars,setAvatars]=useState([]),[music,setMusic]=useState([]),[templates,setTemplates]=useState([]),[error,setError]=useState(""),[busy,setBusy]=useState(false),[job,setJob]=useState(null),[aiStatus,setAiStatus]=useState({connected:false,status:"checking",message:"Memeriksa OpenAI..."});
- const[research,setResearch]=useState({mode:"horror",customQuery:"",startDate:new Date().toISOString().slice(0,10),endDate:new Date().toISOString().slice(0,10),exclude:excludeDefaults.join("\n"),maxCandidates:10});
- const[selected,setSelected]=useState([]),[articleSearch,setArticleSearch]=useState(""),[statusFilter,setStatusFilter]=useState("SCORED");
- const[content,setContent]=useState({storyId:"",avatarId:"",templateId:"",platform:"facebook_reels",fit:"cover",watermarkPosition:"top-left",watermarkOpacity:35,subtitleColor:"#ffffff",musicId:"",musicVolume:0.15});
- const[notice,setNotice]=useState("");
- const[avatarForm,setAvatarForm]=useState({name:"",description:"",defaultEmotion:"neutral",imageData:"",voiceData:"",voiceName:""});
- const refresh=async()=>{try{const[d,a,q,s,av,mu,t]=await Promise.all([api("/dashboard"),api("/articles?page=1&limit=100&search=&status=ALL"),api("/queue"),api("/scripts"),api("/avatars"),api("/music"),api("/templates")]);setDash(d);setArticles(a);setQueue(q.items||[]);setScripts(s.items||[]);setAvatars(av.items||[]);setMusic(mu.items||[]);setTemplates(t.items||[])}catch(e){setError(e.message)}};
- useEffect(()=>{refresh();const check=()=>api("/ai-status").then(setAiStatus).catch(e=>setAiStatus({connected:false,status:"backend_error",message:e.message}));check();const timer=setInterval(check,30000);return()=>clearInterval(timer)},[]);
- useEffect(()=>{
-   if(page!=="Article Gallery")return;
-   const timer=setTimeout(()=>{
-     api("/articles?page=1&limit=100&search="+encodeURIComponent(articleSearch)+"&status="+encodeURIComponent(statusFilter))
-       .then(setArticles).catch(e=>setError(e.message));
-   },250);
-   return()=>clearTimeout(timer);
- },[page,statusFilter,articleSearch]);
- const runResearch=async()=>{
-   setBusy(true);setError("");setJob({percent:0,stage:"Memulai research"});
-   try{
-     const queries=research.mode==="custom"?[research.customQuery]:horrorQueries;
-     const excludes=research.exclude.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-     const start=research.mode==="horror"&&research.startDate?research.startDate:research.startDate;
-     const end=research.endDate;
-     const j=await api("/jobs/research",{method:"POST",body:JSON.stringify({mode:research.mode,queries,excludedKeywords:excludes,startDate:start,endDate:end,todayOnly:false,topCandidates:Number(research.maxCandidates),localOnly:false})});
-     const es=new EventSource(API+"/jobs/"+j.id+"/events");
-     es.onmessage=e=>{const ev=JSON.parse(e.data);if(ev.type==="progress")setJob({percent:ev.percent,stage:ev.stage});if(ev.type==="error")setError(ev.message);if(ev.type==="complete"){setJob({percent:100,stage:ev.status==="completed"?"Research selesai":ev.error||"Gagal",result:ev.result||null,status:ev.status});es.close();refresh();}};
-     es.onerror=()=>es.close();
-   }catch(e){setError(e.message)}finally{setBusy(false)}
- };
- const selectArticles=async()=>{if(!selected.length)return;setError("");setNotice("");try{const ids=[...selected];const result=await api("/queue/select",{method:"POST",body:JSON.stringify({ids})});setSelected([]);await refresh();const inserted=Number(result.inserted||0);const alreadyQueued=Number(result.alreadyQueued||0);const requested=Number(result.requested||ids.length);if(inserted>0||alreadyQueued>0){setNotice("✓ "+inserted+" artikel baru masuk Production Queue"+(alreadyQueued?" · "+alreadyQueued+" artikel sudah ada di queue":"")+".");setPage("Production Queue")}else{setError("Tidak ada artikel yang berhasil masuk queue. Pastikan artikel memiliki AI score dan source tersedia.")}}catch(e){setError("Gagal memasukkan artikel ke Production Queue: "+e.message)}};
- const deleteArticle=async id=>{if(!window.confirm("Yakin ingin menghapus artikel ini beserta score, queue, dan story terkait?"))return;try{await api("/articles/"+id,{method:"DELETE"});setSelected(x=>x.filter(v=>String(v)!==String(id)));await refresh()}catch(e){setError("Gagal menghapus artikel: "+e.message)}};
- const removeQueueItem=async queueId=>{if(!window.confirm("Hapus artikel dari Production Queue? Artikel akan kembali ke Article Gallery."))return;try{await api("/queue/"+queueId,{method:"DELETE"});await refresh()}catch(e){setError("Gagal menghapus dari queue: "+e.message)}};
- const generate=async storyId=>{try{const j=await api("/jobs/generate",{method:"POST",body:JSON.stringify({storyId})});setJob({percent:0,stage:"Menulis cerita"});const es=new EventSource(API+"/jobs/"+j.id+"/events");es.onmessage=e=>{const ev=JSON.parse(e.data);if(ev.type==="progress")setJob({percent:ev.percent,stage:ev.stage});if(ev.type==="error")setError("AI gagal: "+ev.message);if(ev.type==="complete"){if(ev.status==="failed")setError("AI gagal: "+(ev.error||"Proses gagal."));es.close();refresh();}}}catch(e){setError("AI gagal: "+e.message)}};
- const saveContent=async()=>{try{await api("/content-settings",{method:"PUT",body:JSON.stringify(content)});alert("Content Management tersimpan.")}catch(e){setError(e.message)}};
- const title=page==="Research RRS"?"Research RRS":page;
- return <div className="app">
-  <aside className="side"><div className="brand"><div className="logo">🔥</div><div><b>ANP</b><strong>ENGINE RRS</strong><small>LOCAL CREATOR PIPELINE</small></div></div><div className="workspace">Creator Workspace <span>LOCAL</span></div><nav>{menus.map(m=><button className={page===m?"active":""} onClick={()=>setPage(m)} key={m}>{m}</button>)}</nav><div className="side-note"><b>Pipeline</b><span>RSS → Source → Score → Story → Video</span></div></aside>
-  <main><header><div><small>Workspace / {title}</small><h1>{title}</h1></div><div className="header-actions"><div className={"ai-status "+(aiStatus.connected?"connected":"offline")} title={aiStatus.message}><span></span><b>{aiStatus.connected?"OpenAI Connected":"OpenAI Offline"}</b><small>{aiStatus.connected?"API ready":aiStatus.message}</small></div><button className="btn ghost" onClick={refresh}>↻ Refresh</button></div></header>
-  <div className="wrap">{notice&&<div className="success">✓ {notice}<button onClick={()=>setNotice("")}>×</button></div>}{error&&<div className="error">⚠ {error}<button onClick={()=>setError("")}>×</button></div>}
-  {job&&<div className="job"><b>LIVE PROCESS</b><span>{job.stage}</span><div className="bar"><i style={{width:job.percent+"%"}}/></div><small>{job.percent}%</small>{job.result&&<div className="job-result"><b>{job.status==="completed"?"✓ Research selesai":"⚠ Research gagal"}</b><span>Data ditemukan: <strong>{job.result.rawCount??0}</strong></span><span>Source tersedia: <strong>{job.result.fetchedCount??0}</strong></span><span>Source tidak tersedia: <strong>{job.result.unavailableCount??0}</strong></span><span>AI score tersimpan: <strong>{job.result.scoredCount??0}</strong></span></div>}</div>}
-  {page==="Dashboard"&&<Dashboard dash={dash} setPage={setPage}/>}
-  {page==="Research RRS"&&<Research research={research} setResearch={setResearch} runResearch={runResearch} busy={busy}/>}
-  {page==="Article Gallery"&&<Gallery articles={articles} search={articleSearch} setSearch={setArticleSearch} status={statusFilter} setStatus={setStatusFilter} selected={selected} setSelected={setSelected} onQueue={selectArticles} onDelete={deleteArticle}/>} 
-  {page==="Production Queue"&&<Queue queue={queue} generate={generate} remove={removeQueueItem}/>}
-  {page==="Story Writer"&&<Writer scripts={scripts} queue={queue} generate={generate}/>}
-  {page==="Content Management"&&<Content content={content} setContent={setContent} avatars={avatars} music={music} templates={templates} scripts={scripts} save={saveContent} />}
-  {page==="Settings"&&<Settings avatars={avatars} setAvatars={setAvatars} form={avatarForm} setForm={setAvatarForm} music={music} refresh={refresh}/>}
-  </div></main></div>
-}
-function Dashboard({dash,setPage}){return <><section className="hero"><div><span>HORROR CONTENT OPERATIONS</span><h2>Research once.<br/><em>Turn it into stories.</em></h2><p>Source-first workflow with SQLite as the single local source of truth.</p><button className="btn primary" onClick={()=>setPage("Research RRS")}>Start Research →</button></div><div className="hero-art">LOCAL<br/><b>PIPELINE</b></div></section><div className="stats">{[["Articles",dash?.totalArticles||0],["Scripts",dash?.written||0],["Queue",dash?.queueTotal||0],["Rendered",dash?.queueStatuses?.RENDERED||0],["Published",dash?.queueStatuses?.PUBLISHED||0]].map(x=><div className="stat" key={x[0]}><small>{x[0]}</small><strong>{x[1]}</strong></div>)}</div><section className="grid two"><div className="card"><h3>Recent articles</h3>{(dash?.recentArticles||[]).map(a=><div className="row" key={a.id}><div><b>{a.title}</b><small>{a.source} · {a.published}</small></div><Badge>{a.queue_status||a.status}</Badge></div>)}{!dash?.recentArticles?.length&&<Empty/>}</div><div className="card"><h3>Pipeline</h3><div className="pipeline">{["FOUND","FETCHED","SCORED","SELECTED","SCRIPT READY","VIDEO QUEUED","GENERATING","COMPLETED"].map((x,i)=><span key={x}><b>{i+1}</b>{x}</span>)}</div></div></section></>}
-function Research({research,setResearch,runResearch,busy}){return <section className="card form"><h3>Research configuration</h3><div className="mode"><button className={research.mode==="horror"?"selected":""} onClick={()=>setResearch({...research,mode:"horror"})}>Horror / Mystery</button><button className={research.mode==="custom"?"selected":""} onClick={()=>setResearch({...research,mode:"custom"})}>Custom Query</button></div>{research.mode==="custom"? <><label>Custom query</label><input value={research.customQuery} onChange={e=>setResearch({...research,customQuery:e.target.value})} placeholder="kisah horor indonesia yang sedang viral"/></>:<div className="hint">Mode ini memakai kategori broad horror, mystery, murder, crime, strange/terrifying incidents secara lokal.</div>}<div className="grid two"><div><label>Start Date</label><input type="date" value={research.startDate} onChange={e=>setResearch({...research,startDate:e.target.value})}/></div><div><label>End Date</label><input type="date" value={research.endDate} onChange={e=>setResearch({...research,endDate:e.target.value})}/></div></div><label>Exclude keywords <small>optional</small></label><textarea value={research.exclude} onChange={e=>setResearch({...research,exclude:e.target.value})}/><label>Maximum AI Candidate <b>{research.maxCandidates}</b></label><input type="range" min="1" max="50" value={research.maxCandidates} onChange={e=>setResearch({...research,maxCandidates:e.target.value})}/><p className="hint">Local filtering happens first. Only the selected number of candidates reaches OpenAI.</p><button className="btn primary" disabled={busy} onClick={runResearch}>{busy?"Research berjalan…":"Run Research"}</button></section>}
-function Gallery({articles,search,setSearch,status,setStatus,selected,setSelected,onQueue,onDelete}){const items=articles.items||[];return <section><div className="toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setSearch(e.target.value)} placeholder="Search article…"/><select value={status} onChange={e=>setStatus(e.target.value)}><option>ALL</option><option>SCORED</option><option>FETCHED</option><option>ISI TIDAK TERSEDIA</option></select><button className="btn primary" onClick={onQueue} disabled={!selected.length}>Add selected to Production Queue ({selected.length})</button></div><div className="gallery">{items.map(a=><article className="article card" key={a.id}><div className="check"><input type="checkbox" checked={selected.includes(a.id)} onChange={e=>setSelected(e.target.checked?[...selected,a.id]:selected.filter(x=>x!==a.id))}/></div><div><Badge>{a.fetch_status==="ISI TIDAK TERSEDIA"?"ISI TIDAK TERSEDIA":a.status}</Badge><h3>{a.title}</h3><p>{a.source} · {a.published}</p><div className="scores"><span>Overall <b>{a.overall_score??"—"}</b></span><span>Coverage <b>{a.coverage_count??0}</b></span><span>Source <b>{a.unique_source_count??0}</b></span></div><p className="muted">{a.fetch_status==="ISI TIDAK TERSEDIA"?"Isi sumber tidak tersedia — tidak boleh auto-script.":a.ai_reason||"Source content tersedia."}</p><div className="article-actions"><a href={a.url} target="_blank" rel="noreferrer">Open original ↗</a><button className="delete-btn" onClick={()=>onDelete(a.id)}>Delete</button></div></div></article>)}</div>{!items.length&&<Empty/>}</section>}
-function Queue({queue,generate,remove}){return <section className="card"><h3>Production Queue</h3>{queue.map(q=><div className="row" key={q.queue_id}><div><b>{q.title}</b><small>{q.source} · Score {q.overall_score??0}</small></div><div className="actions"><Badge>{q.queue_status}</Badge>{!q.has_script&&<button className="btn small" onClick={()=>generate(q.story_id)}>AI Write</button>}<button className="delete-btn" onClick={()=>remove(q.queue_id)}>Delete</button></div></div>)}{!queue.length&&<Empty text="Belum ada artikel yang dipilih dari Article Gallery."/>}</section>}
-function Writer({scripts,queue,generate}){
- const [expanded,setExpanded]=useState({});
- const copy=async(text,label)=>{try{await navigator.clipboard.writeText(String(text||""));alert(label+" berhasil disalin.")}catch(e){alert("Gagal copy: "+e.message)}};
- const speechText=s=>String(s||"").replace(/^\s*(visual|camera|scene direction|sfx|music)\s*:\s*.*$/gim,"").replace(/\n{3,}/g,"\n\n").trim();
- const pending=queue.filter(q=>!q.has_script);
- const toggleFull=id=>setExpanded(x=>({...x,[id]:!x[id]}));
- return <section className="grid two">
-  <div className="card"><h3>Story Writer</h3><p className="hint">Artikel terpilih dari Production Queue yang belum memiliki naskah.</p>{pending.map(q=><div className="row" key={q.story_id}><div><b>{q.title}</b><small>{q.source} · Score {q.overall_score??0}</small></div><button className="btn small" onClick={()=>generate(q.story_id)}>Generate Script</button></div>)}{!pending.length&&<Empty text="Tidak ada artikel yang menunggu naskah. Generate dari queue atau pilih artikel lain dari Article Gallery."/>}</div>
-  <div className="card"><h3>Story Library</h3><p className="hint">Preview naskah ditampilkan langsung. Gunakan Naskah Lengkap untuk membuka seluruh bagian, atau copy sesuai kebutuhan voice-over.</p>{!scripts.length&&<Empty text="Belum ada naskah. Pilih artikel di Production Queue lalu Generate Script."/>}{scripts.map(s=><div className="script preview-script" key={s.id}>
-   <div className="script-head"><div><b>{s.title}</b><small>{s.story_type||"Story"} · {s.source||"Source"}</small></div></div>
-   <div className="script-part preview-main"><label>PREVIEW NASKAH</label><p>{s.hook||"—"}</p><pre className="script-preview">{s.script||"Naskah belum tersedia."}</pre></div>
-   <div className="script-actions">
-    <button className="btn small" onClick={()=>toggleFull(s.id)}>{expanded[s.id]?"Sembunyikan Naskah":"Naskah Lengkap"}</button>
-    <button className="btn small" onClick={()=>copy(s.script||"","Copy Naskah")}>Copy Naskah</button>
-    <button className="btn small" onClick={()=>copy(speechText(s.script||""),"Google AI Studio Speech Script")}>Copy Google AI Studio Speech</button>
-   </div>
-   {expanded[s.id]&&<><div className="script-part"><label>HOOK</label><p>{s.hook||"—"}</p></div><div className="script-part"><label>NASKAH LENGKAP</label><pre className="script-preview">{s.script||"Naskah belum tersedia."}</pre></div>{s.ending&&<div className="script-part"><label>ENDING</label><p>{s.ending}</p></div>}<div className="script-part"><label>CAPTION</label><p>{s.caption||"—"}</p></div><div className="script-part"><label>HASHTAGS</label><p>{s.hashtags||"—"}</p></div></>}
-  </div>)}</div>
- </section>
-}
-function Content({content,setContent,avatars,music,templates,scripts,save}){return <section className="card form"><h3>Content Management</h3><p className="hint">Pilih story yang sudah approved, avatar, template, voice/music, dan format platform.</p><label>Story</label><select value={content.storyId} onChange={e=>setContent({...content,storyId:e.target.value})}><option value="">Pilih story</option>{scripts.map(s=><option value={s.story_id} key={s.story_id}>{s.title}</option>)}</select><div className="grid two"><div><label>Avatar</label><select value={content.avatarId} onChange={e=>setContent({...content,avatarId:e.target.value})}><option value="">Pilih avatar</option>{avatars.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select></div><div><label>Template</label><select value={content.templateId} onChange={e=>setContent({...content,templateId:e.target.value})}><option value="">Default</option>{templates.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select></div></div><div className="grid two"><div><label>Platform</label><select value={content.platform} onChange={e=>setContent({...content,platform:e.target.value})}><option value="facebook_reels">Facebook Reels</option><option value="instagram_reels">Instagram Reels</option><option value="tiktok">TikTok</option><option value="youtube_shorts">YouTube Shorts</option></select></div><div><label>Video Fit</label><select value={content.fit} onChange={e=>setContent({...content,fit:e.target.value})}><option value="cover">Cover</option><option value="contain">Contain</option></select></div></div><div className="grid two"><div><label>Watermark Position</label><select value={content.watermarkPosition} onChange={e=>setContent({...content,watermarkPosition:e.target.value})}><option>top-left</option><option>center</option><option>top-right</option></select></div><div><label>Watermark Opacity <b>{content.watermarkOpacity}%</b></label><input type="range" min="0" max="100" value={content.watermarkOpacity} onChange={e=>setContent({...content,watermarkOpacity:Number(e.target.value)})}/></div></div><div className="grid two"><div><label>Subtitle Color</label><input type="color" value={content.subtitleColor} onChange={e=>setContent({...content,subtitleColor:e.target.value})}/></div><div><label>Music</label><select value={content.musicId} onChange={e=>setContent({...content,musicId:e.target.value})}><option value="">None</option>{music.map(m=><option value={m.id} key={m.id}>{m.name}</option>)}</select></div></div><button className="btn primary" onClick={save}>Save Content Configuration</button><div className="hint">Video renderer is kept as the next engine layer; this screen stores the approved production configuration without pretending a render already happened.</div></section>}
-function Settings({avatars,setAvatars,form,setForm,music,refresh}){const saveAvatar=async()=>{if(!form.name)return;await api("/avatars",{method:"POST",body:JSON.stringify(form)});setForm({name:"",description:"",defaultEmotion:"neutral",imageData:"",voiceData:"",voiceName:""});refresh()};return <section className="grid two"><div className="card form"><h3>Character Library</h3><label>Character name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/><label>Description</label><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/><label>Default emotion</label><select value={form.defaultEmotion} onChange={e=>setForm({...form,defaultEmotion:e.target.value})}>{["neutral","curious","fear","shock","sad","angry"].map(x=><option key={x}>{x}</option>)}</select><label>Avatar image</label><input type="file" accept="image/*" onChange={async e=>e.target.files[0]&&setForm({...form,imageData:await readFile(e.target.files[0])})}/><label>Voice audio <small>optional</small></label><input type="file" accept="audio/*" onChange={async e=>e.target.files[0]&&setForm({...form,voiceData:await readFile(e.target.files[0]),voiceName:e.target.files[0].name})}/><button className="btn primary" onClick={saveAvatar}>Save Character</button></div><div className="card"><h3>Saved Characters</h3>{avatars.map(a=><div className="row" key={a.id}><div><b>{a.name}</b><small>{a.default_emotion} · {a.voice_name||"Local TTS fallback"}</small></div><Badge>READY</Badge></div>)}<h3 className="mt">Music Library</h3>{music.map(m=><div className="row" key={m.id}><div><b>{m.name}</b><small>{m.source||"Local"} · {m.license||"License not set"}</small></div><span>{Math.round((m.volume||.15)*100)}%</span></div>)}</div></section>}
-function Empty({text="Belum ada data."}){return <div className="empty">{text}</div>}
-export default App;
