@@ -540,7 +540,7 @@ def run_action(action, cfg):
             params = [status]
         return {"items": query_all(f"""
             SELECT q.id queue_id, q.story_id, q.rank, q.research_popularity,
-                   q.overall_score, q.status queue_status, s.title, s.url,
+                   COALESCE(q.overall_score, s.overall_score, s.ai_score) AS overall_score, q.status queue_status, s.title, s.url,
                    s.source, s.published,
                    CASE WHEN g.id IS NULL THEN 0 ELSE 1 END has_script
             FROM production_queue q
@@ -561,21 +561,57 @@ def run_action(action, cfg):
     if action == "select_articles":
         ids = [int(value) for value in cfg.get("ids", [])]
         inserted = 0
+        already_queued = 0
+        skipped = 0
         current_rank = query_all("SELECT COALESCE(MAX(rank), 0) AS max_rank FROM production_queue")[0]["max_rank"]
-        for rank, story_id in enumerate(ids, int(current_rank or 0) + 1):
+        next_rank = int(current_rank or 0) + 1
+
+        for story_id in ids:
             rows = query_all(
-                "SELECT id, popularity_score, overall_score FROM stories WHERE id = ? AND ai_score IS NOT NULL",
+                "SELECT id, popularity_score, overall_score, ai_score FROM stories WHERE id = ?",
                 (story_id,),
             )
-            if rows and queue_selected_topic(
-                story_id,
-                rank,
-                rows[0].get("popularity_score") or 0,
-                rows[0].get("overall_score") or rows[0].get("ai_score") or 0,
-            ):
-                __import__("database.database", fromlist=["get_connection"]).get_connection().execute if False else None
-                inserted += 1
-        return {"inserted": inserted, "requested": len(ids)}
+            if not rows or rows[0].get("ai_score") is None:
+                skipped += 1
+                continue
+
+            row = rows[0]
+            score = row.get("overall_score")
+            if score is None:
+                score = row.get("ai_score")
+            popularity = row.get("popularity_score") or 0
+
+            conn = __import__("database.database", fromlist=["get_connection"]).get_connection()
+            try:
+                existing = conn.execute("SELECT id FROM production_queue WHERE story_id = ?", (story_id,)).fetchone()
+                if existing:
+                    conn.execute(
+                        """UPDATE production_queue
+                           SET overall_score = COALESCE(?, overall_score),
+                               research_popularity = COALESCE(?, research_popularity),
+                               status = CASE WHEN status IN ('FAILED','PUBLISHED','RENDERED') THEN status ELSE 'SELECTED' END,
+                               selected_at = CURRENT_TIMESTAMP
+                           WHERE story_id = ?""",
+                        (score, popularity, story_id),
+                    )
+                    conn.execute("UPDATE stories SET status='SELECTED', used_at=CURRENT_TIMESTAMP WHERE id=?", (story_id,))
+                    conn.commit()
+                    already_queued += 1
+                else:
+                    conn.execute(
+                        """INSERT INTO production_queue
+                           (story_id, rank, research_popularity, overall_score, status)
+                           VALUES (?, ?, ?, ?, 'SELECTED')""",
+                        (story_id, next_rank, popularity, score),
+                    )
+                    conn.execute("UPDATE stories SET status='SELECTED', used_at=CURRENT_TIMESTAMP WHERE id=?", (story_id,))
+                    conn.commit()
+                    inserted += 1
+                    next_rank += 1
+            finally:
+                conn.close()
+
+        return {"inserted": inserted, "alreadyQueued": already_queued, "skipped": skipped, "requested": len(ids)}
 
     if action == "remove_queue_item":
         from database.database import remove_queue_item
