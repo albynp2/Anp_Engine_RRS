@@ -17,6 +17,7 @@ STYLE = (", cinematic dark moody illustration, dramatic lighting, vertical compo
          "no text, no watermark, no logo, no real person, no gore")
 
 PROVIDERS = [
+    {"id": "website", "label": "Screenshot website berita (sumber asli)"},
     {"id": "pollinations", "label": "AI gratis (Pollinations) - butuh internet"},
     {"id": "openai", "label": "OpenAI image (berbayar, pakai API key)"},
     {"id": "gradient", "label": "Gradient gelap (offline, tanpa gambar AI)"},
@@ -50,6 +51,25 @@ def _pollinations(prompt: str, w: int, h: int, seed: int) -> Image.Image:
     return img.convert("RGB")
 
 
+def _website_screenshot(url: str, w: int, h: int) -> Image.Image:
+    if not url:
+        raise RuntimeError("URL berita tidak tersedia untuk screenshot website.")
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        raise RuntimeError("Playwright belum terpasang. Jalankan: pip install playwright && playwright install chromium") from e
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": w, "height": h}, device_scale_factor=1)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(1200)
+            shot = page.screenshot(type="jpeg", quality=90)
+        finally:
+            browser.close()
+    return Image.open(io.BytesIO(shot)).convert("RGB")
+
+
 def _openai(prompt: str) -> Image.Image:
     from .llm import _client
     r = _client().images.generate(model=config.OPENAI_IMAGE_MODEL, prompt=prompt + STYLE,
@@ -58,11 +78,12 @@ def _openai(prompt: str) -> Image.Image:
 
 
 def scene_image(prompt: str, story_id: int, provider: str, emotion: str, idx: int,
-                w: int = 720, h: int = 1280, log: Callable = lambda m, l="info": None) -> Image.Image:
+                w: int = 720, h: int = 1280, log: Callable = lambda m, l="info": None,
+                source_url: str = "") -> Image.Image:
     """Kembalikan PIL image untuk satu scene. Bila gagal -> gradient (dan dicatat di log)."""
     folder = config.MEDIA_DIR / f"story_{story_id}"
     folder.mkdir(parents=True, exist_ok=True)
-    key = hashlib.sha1(f"{provider}|{prompt}|{w}x{h}".encode()).hexdigest()[:16]
+    key = hashlib.sha1(f"{provider}|{prompt}|{source_url}|{w}x{h}".encode()).hexdigest()[:16]
     cache = folder / f"img_{key}.jpg"
     if provider != "gradient" and prompt and cache.exists():
         try:
@@ -73,10 +94,12 @@ def scene_image(prompt: str, story_id: int, provider: str, emotion: str, idx: in
     if provider != "gradient" and prompt:
         for attempt in range(2):
             try:
-                img = _openai(prompt) if provider == "openai" else _pollinations(prompt, w, h, seed + attempt)
+                img = _website_screenshot(source_url, w, h) if provider == "website" else (_openai(prompt) if provider == "openai" else _pollinations(prompt, w, h, seed + attempt))
                 img.save(cache, "JPEG", quality=90)
                 return img
             except Exception as e:
                 log(f"Gambar scene {idx + 1} gagal (percobaan {attempt + 1}): {str(e)[:120]}", "warning")
         log(f"Scene {idx + 1} memakai gradient sebagai pengganti.", "warning")
+    if provider in ("openai", "pollinations", "website"):
+        raise RuntimeError(f"Provider gambar '{provider}' gagal menghasilkan gambar setelah 2 percobaan.")
     return gradient_image(w, h, emotion, seed)
